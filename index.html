@@ -1,0 +1,1058 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Suivi de gestion Terrah : CA par pole, impayes, clients B2B a relancer, flux du coffeeshop.">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%E2%98%95%3C/text%3E%3C/svg%3E">
+<style>
+:root{color-scheme:light dark}
+html,body{margin:0}
+body{-webkit-font-smoothing:antialiased}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+<title>Terrah — Suivi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#F6F3ED; --surface:#FFFDFA; --raise:#EFEAE1;
+  --ink:#1D1913; --ink-2:#4A4238; --mut:#7C7264; --line:#E1D9CC; --line-2:#CFC4B2;
+  --roast:#A65523; --roast-soft:#F0E0D2; --green:#4C7A3C; --green-soft:#E2ECDC;
+  --crit:#B03526; --crit-soft:#F6DFDA; --warn:#9A6B0E; --warn-soft:#F6E9CE;
+  --shadow:0 1px 2px rgba(35,25,12,.06), 0 8px 24px -14px rgba(35,25,12,.22);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#15120D; --surface:#1E1A14; --raise:#262019;
+    --ink:#F0EAE0; --ink-2:#C6BCAC; --mut:#948A7B; --line:#302920; --line-2:#443A2C;
+    --roast:#E08B47; --roast-soft:#3A2617; --green:#8CBB72; --green-soft:#22301B;
+    --crit:#E87761; --crit-soft:#3A1F19; --warn:#DFAA46; --warn-soft:#33270F;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -16px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#15120D; --surface:#1E1A14; --raise:#262019;
+  --ink:#F0EAE0; --ink-2:#C6BCAC; --mut:#948A7B; --line:#302920; --line-2:#443A2C;
+  --roast:#E08B47; --roast-soft:#3A2617; --green:#8CBB72; --green-soft:#22301B;
+  --crit:#E87761; --crit-soft:#3A1F19; --warn:#DFAA46; --warn-soft:#33270F;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -16px rgba(0,0,0,.7);
+}
+*{box-sizing:border-box}
+body{background:var(--ground); color:var(--ink);
+  font-family:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif; font-size:15px; line-height:1.55}
+.wrap{max-width:1080px; margin:0 auto; padding:32px 22px 80px; display:flex; flex-direction:column; gap:40px}
+h1,h2,h3{font-family:"IBM Plex Sans Condensed","IBM Plex Sans",Arial,sans-serif; margin:0; text-wrap:balance}
+.eyebrow{font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--mut)}
+header.top{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between;
+  gap:16px; border-bottom:2px solid var(--ink); padding-bottom:14px}
+header.top h1{font-size:32px; font-weight:700; letter-spacing:-.01em}
+header.top h1 span{color:var(--roast)}
+.meta{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--mut); text-align:right}
+section{display:flex; flex-direction:column; gap:16px}
+.shead{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;
+  border-bottom:1px solid var(--line-2); padding-bottom:8px}
+.shead h2{font-size:20px; font-weight:600}
+.shead .sub{font-size:13px; color:var(--mut)}
+
+/* ---- sources & import ---- */
+.sources{display:grid; grid-template-columns:1.15fr 1fr; gap:18px; align-items:stretch}
+.drop{border:1.5px dashed var(--line-2); border-radius:5px; background:var(--surface);
+  padding:18px; display:flex; flex-direction:column; gap:10px; justify-content:center;
+  transition:border-color .15s, background .15s}
+.drop.over{border-color:var(--roast); background:var(--roast-soft)}
+.drop h3{font-size:15px}
+.drop p{margin:0; font-size:13px; color:var(--mut)}
+.btn{align-self:flex-start; font-family:"IBM Plex Sans",sans-serif; font-size:13.5px; font-weight:500;
+  background:var(--ink); color:var(--ground); border:none; border-radius:4px;
+  padding:8px 16px; cursor:pointer}
+.btn:hover{background:var(--roast)}
+.btn:focus-visible{outline:2px solid var(--roast); outline-offset:2px}
+.srcstate{background:var(--surface); border:1px solid var(--line); border-radius:5px; padding:14px 16px}
+.srcstate table{width:100%; font-size:12.5px; border-collapse:collapse}
+.srcstate td{padding:4px 0; border:none; vertical-align:top}
+.srcstate td:first-child{font-weight:500; white-space:nowrap; padding-right:12px}
+.srcstate td:last-child{color:var(--mut); text-align:right}
+.dot-ok,.dot-fix{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px}
+.dot-ok{background:var(--green)} .dot-fix{background:var(--warn)}
+#msg{font-size:13px; padding:10px 14px; border-radius:4px; display:none}
+#msg.ok{display:block; background:var(--green-soft); color:var(--green); border-left:3px solid var(--green)}
+#msg.err{display:block; background:var(--crit-soft); color:var(--crit); border-left:3px solid var(--crit)}
+
+/* ---- selecteur de periode ---- */
+.periodbar{display:flex; flex-wrap:wrap; gap:14px; align-items:center;
+  background:var(--raise); border:1px solid var(--line); border-radius:5px; padding:10px 14px;
+  position:sticky; top:0; z-index:5}
+.seg{display:inline-flex; border:1px solid var(--line-2); border-radius:4px; overflow:hidden}
+.seg button{font-family:"IBM Plex Mono",monospace; font-size:12px; letter-spacing:.06em;
+  text-transform:uppercase; background:transparent; color:var(--ink-2); border:none;
+  padding:7px 15px; cursor:pointer; border-right:1px solid var(--line-2)}
+.seg button:last-child{border-right:none}
+.seg button[aria-pressed="true"]{background:var(--ink); color:var(--ground)}
+.seg button:focus-visible{outline:2px solid var(--roast); outline-offset:-2px}
+select{font-family:"IBM Plex Mono",monospace; font-size:13px; padding:6px 10px;
+  border:1px solid var(--line-2); border-radius:4px; background:var(--surface); color:var(--ink)}
+.pnav{background:var(--surface); border:1px solid var(--line-2); border-radius:4px;
+  color:var(--ink); cursor:pointer; width:30px; height:30px; font-size:15px; line-height:1}
+.pnav:disabled{opacity:.35; cursor:default}
+.periodbar .spacer{flex:1}
+.periodbar .cur{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--mut)}
+
+/* ---- tuiles ---- */
+.tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(212px,1fr)); gap:14px}
+.tile{background:var(--surface); border:1px solid var(--line); border-radius:4px;
+  padding:16px; display:flex; flex-direction:column; gap:6px; box-shadow:var(--shadow)}
+.tile h3{font-size:13px; font-weight:600; color:var(--ink-2)}
+.big{font-family:"IBM Plex Mono",monospace; font-size:25px; font-weight:500;
+  font-variant-numeric:tabular-nums; letter-spacing:-.02em}
+.evrow{min-height:20px; display:flex; gap:12px; flex-wrap:wrap}
+.ev{font-family:"IBM Plex Mono",monospace; font-size:12px; font-weight:500}
+.ev em{font-style:normal; color:var(--mut); font-weight:400}
+.up{color:var(--green)} .down{color:var(--crit)} .flat{color:var(--mut)}
+.gauge{height:5px; background:var(--raise); border-radius:3px; overflow:hidden; margin-top:4px}
+.gfill{height:100%; background:var(--roast)}
+.gtxt,.note{font-size:11.5px; color:var(--mut); margin:0}
+
+/* ---- graphes ---- */
+.chart{background:var(--surface); border:1px solid var(--line); border-radius:4px;
+  padding:14px 8px 6px; overflow-x:auto}
+.chart svg{display:block; width:100%; min-width:600px; height:auto}
+.grid{stroke:var(--line); stroke-width:1}
+.ax{font-family:"IBM Plex Mono",monospace; font-size:10.5px; fill:var(--mut)}
+.ar{text-anchor:end} .am{text-anchor:middle}
+.bar{fill:var(--green); opacity:.75}
+.bar.cur{opacity:1}
+.bar2{fill:var(--roast); opacity:.8}
+.bar2.cur{opacity:1}
+.objline{stroke:var(--crit); stroke-width:1.2; stroke-dasharray:5 4}
+.objtxt{fill:var(--crit)}
+.line{fill:none; stroke:var(--ink); stroke-width:1.6; stroke-linejoin:round}
+.dot{fill:var(--surface); stroke:var(--ink); stroke-width:1.4}
+.st1{fill:var(--roast); opacity:.85} .st2{fill:var(--warn); opacity:.8} .st3{fill:var(--green); opacity:.85}
+.legend{display:flex; flex-wrap:wrap; gap:16px; font-size:12px; color:var(--mut);
+  font-family:"IBM Plex Mono",monospace}
+.legend span{display:inline-flex; align-items:center; gap:6px}
+.sw{width:10px; height:10px; border-radius:2px; display:inline-block}
+
+/* ---- tableaux ---- */
+.tbl{overflow-x:auto; background:var(--surface); border:1px solid var(--line); border-radius:4px}
+table{border-collapse:collapse; width:100%; min-width:500px; font-size:13.5px}
+th,td{padding:8px 12px; text-align:left; border-bottom:1px solid var(--line)}
+th{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--mut); font-weight:500; white-space:nowrap; background:var(--raise)}
+tbody tr:last-child td{border-bottom:none}
+td.n{font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums;
+  text-align:right; white-space:nowrap}
+td.cl{font-weight:500}
+td.mut{color:var(--mut); font-size:12.5px}
+td em{font-style:normal; color:var(--green); font-size:12px}
+.pill{font-family:"IBM Plex Mono",monospace; font-size:11px; font-weight:500;
+  padding:2px 7px; border-radius:3px; white-space:nowrap}
+.pill.warn{background:var(--warn-soft); color:var(--warn)}
+.pill.crit{background:var(--crit-soft); color:var(--crit)}
+.pill.good{background:var(--green-soft); color:var(--green)}
+.empty{padding:14px; color:var(--mut); font-size:13px}
+
+.duo{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:18px; align-items:start}
+.kpis{display:flex; flex-wrap:wrap; gap:26px}
+.kpi .k{font-family:"IBM Plex Mono",monospace; font-size:22px; font-weight:500; font-variant-numeric:tabular-nums}
+.kpi .l{font-size:12px; color:var(--mut)}
+.sublabel{font-size:12.5px; color:var(--mut); margin:0}
+h3.mini{font-size:15px; margin-top:6px}
+a{color:var(--roast)}
+.banner{display:flex; flex-wrap:wrap; gap:18px; align-items:center; justify-content:space-between;
+  background:var(--crit-soft); border-left:3px solid var(--crit); border-radius:0 4px 4px 0; padding:14px 18px}
+.banner .bnum{font-family:"IBM Plex Mono",monospace; font-size:24px; font-weight:600; color:var(--crit)}
+.banner p{margin:0; font-size:13.5px; color:var(--ink-2); max-width:62ch}
+
+/* ---- zone chantier ---- */
+.wip{position:relative; border:1px solid var(--line-2); border-radius:5px; padding:18px 20px;
+  background:repeating-linear-gradient(135deg, var(--raise) 0 12px, transparent 12px 24px)}
+.wipbadge{display:inline-flex; align-items:center; gap:7px; font-family:"IBM Plex Mono",monospace;
+  font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--warn);
+  background:var(--warn-soft); border:1px solid var(--warn); border-radius:3px; padding:3px 9px}
+.wip .wipbody{opacity:.5; filter:saturate(.35); margin-top:14px;
+  display:flex; flex-direction:column; gap:14px}
+.wip .wipbody .chart, .wip .wipbody .tbl{background:var(--surface)}
+.wipwhy{margin:12px 0 0; font-size:13px; color:var(--ink-2); max-width:70ch}
+.wipwhy ul{margin:8px 0 0; padding-left:18px}
+.wipwhy li{margin-bottom:4px}
+
+.method{background:var(--raise); border:1px solid var(--line); border-radius:4px;
+  padding:20px 22px; display:flex; flex-direction:column; gap:14px}
+.method h3{font-size:14px}
+.method ul{margin:0; padding-left:18px; font-size:13px; color:var(--ink-2)}
+.method li{margin-bottom:5px}
+.method li b{color:var(--ink); font-weight:600}
+@media (max-width:700px){
+  .sources{grid-template-columns:1fr}
+  header.top h1{font-size:25px}
+  .wrap{padding:22px 14px 60px; gap:32px}
+  .periodbar{position:static}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div>
+    <div class="eyebrow">Suivi de gestion · Terrah</div>
+    <h1>Pilotage <span id="hperiod">—</span></h1>
+  </div>
+  <div class="meta" id="hmeta"></div>
+</header>
+
+<section>
+  <div class="shead"><h2>Données</h2>
+    <span class="sub">seul l'export Axonaut se met à jour depuis cette page</span></div>
+  <div class="sources">
+    <div class="drop" id="drop">
+      <h3>Déposer le dernier export Axonaut</h3>
+      <p>Glissez le fichier <code>export_invoices…csv</code> ici, ou choisissez-le.
+         Le fichier reste dans votre navigateur : rien n'est envoyé nulle part, et la page
+         publiée sur GitHub n'est pas modifiée.</p>
+      <button class="btn" id="pick" type="button">Choisir un fichier</button>
+      <input type="file" id="file" accept=".csv,text/csv" hidden>
+    </div>
+    <div class="srcstate">
+      <table><tbody>
+        <tr><td><span class="dot-ok"></span>Axonaut</td><td id="s-axo">—</td></tr>
+        <tr><td><span class="dot-fix"></span>Square — coffeeshop</td><td id="s-sq">—</td></tr>
+        <tr><td><span class="dot-fix"></span>Shopify — ateliers direct</td><td id="s-shop">—</td></tr>
+        <tr><td><span class="dot-fix"></span>Wecandoo / Funbooker</td><td id="s-atl">—</td></tr>
+      </tbody></table>
+      <p class="note" style="margin-top:10px">Les sources marquées en orange sont figées à la date
+      de génération de la page : elles ne peuvent pas se rafraîchir depuis un site statique.
+      Il faut regénérer la page pour les mettre à jour.</p>
+    </div>
+  </div>
+  <div id="msg" role="status"></div>
+</section>
+
+<div class="periodbar">
+  <div class="seg" role="group" aria-label="Granularité">
+    <button type="button" data-g="W" aria-pressed="false">Semaine</button>
+    <button type="button" data-g="M" aria-pressed="true">Mois</button>
+    <button type="button" data-g="Q" aria-pressed="false">Trimestre</button>
+  </div>
+  <button class="pnav" id="prev" type="button" aria-label="Période précédente">‹</button>
+  <select id="period" aria-label="Période"></select>
+  <button class="pnav" id="next" type="button" aria-label="Période suivante">›</button>
+  <span class="spacer"></span>
+  <span class="cur" id="pcur"></span>
+</div>
+
+<section>
+  <div class="shead"><h2>Vue d'ensemble</h2><span class="sub" id="ovsub"></span></div>
+  <div class="tiles" id="tiles"></div>
+  <p class="sublabel" id="ovnote"></p>
+</section>
+
+<section>
+  <div class="shead"><h2>Impayés</h2><span class="sub">à date, indépendant de la période choisie</span></div>
+  <div class="banner">
+    <div><div class="bnum" id="imp30">—</div><div class="eyebrow" id="imp30n"></div></div>
+    <p id="imptxt"></p>
+  </div>
+  <div class="duo">
+    <div class="tbl"><table>
+      <thead><tr><th>Ancienneté</th><th class="n">Factures</th><th class="n">Montant HT</th></tr></thead>
+      <tbody id="impbuck"></tbody></table></div>
+    <div class="tbl"><table>
+      <thead><tr><th>Plus gros impayés &gt; 30 j</th><th class="n">HT</th><th class="n">Âge</th><th class="n">Facture</th></tr></thead>
+      <tbody id="imptop"></tbody></table></div>
+  </div>
+</section>
+
+<section>
+  <div class="shead"><h2>B2B</h2><span class="sub">récurrent suivi seul, ventes à part</span></div>
+  <div class="kpis" id="b2bkpi"></div>
+  <div class="chart" id="chrec"></div>
+  <p class="sublabel" id="recnote"></p>
+
+  <h3 class="mini">Top 10 clients — <span id="toplbl"></span></h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Client</th><th class="n">CA</th><th class="n">dont récurrent</th>
+      <th class="n">N-1</th><th class="n">Évolution</th><th class="n">Part</th>
+      <th class="n">Dern. cde</th></tr></thead>
+    <tbody id="top10"></tbody></table></div>
+  <p class="sublabel" id="topnote"></p>
+
+  <div class="duo">
+    <div>
+      <h3 class="mini">À relancer <span class="eyebrow">0,86× à 1× du rythme</span></h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Client</th><th class="n">Ratio</th><th class="n">Depuis</th>
+          <th class="n">Rythme</th><th class="n">CA 12 m</th></tr></thead>
+        <tbody id="rel"></tbody></table></div>
+    </div>
+    <div>
+      <h3 class="mini">Risque de churn <span class="eyebrow">1× à 3× du rythme</span></h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Client</th><th class="n">Ratio</th><th class="n">Depuis</th>
+          <th class="n">Rythme</th><th class="n">CA 12 m</th></tr></thead>
+        <tbody id="churn"></tbody></table></div>
+    </div>
+  </div>
+  <p class="sublabel" id="relnote"></p>
+
+  <div class="duo">
+    <div>
+      <h3 class="mini">Nouveaux clients</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Période</th><th class="n">Nouveaux</th></tr></thead>
+        <tbody id="nouv"></tbody></table></div>
+      <p class="sublabel" id="nouvnote"></p>
+    </div>
+    <div>
+      <h3 class="mini">Pipeline</h3>
+      <p class="sublabel" id="pipetxt"></p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="shead"><h2>Coffeeshop Oberkampf</h2><span class="sub" id="shopsub"></span></div>
+  <div class="tiles" id="shoptiles"></div>
+  <div class="chart" id="chshop"></div>
+  <div class="legend">
+    <span><i class="sw" style="background:var(--roast)"></i>CA net HT (barres)</span>
+    <span><i class="sw" style="background:var(--ink)"></i>panier moyen (ligne)</span>
+  </div>
+  <p class="sublabel" id="shopnote"></p>
+  <div class="duo">
+    <div>
+      <h3 class="mini">Mix par catégorie — août 2026</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Catégorie</th><th class="n">CA HT</th><th class="n">Part</th><th class="n">vs juillet</th></tr></thead>
+        <tbody id="mix"></tbody></table></div>
+      <p class="sublabel">Le mix et les produits lancés sont figés au 4 septembre 2026 :
+      ils viennent de Square, pas de l'export Axonaut.</p>
+    </div>
+    <div>
+      <h3 class="mini">Produits lancés</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Produit</th><th class="n">Juin</th><th class="n">Juil</th><th class="n">Août</th>
+          <th class="n">Part mix</th><th>Verdict</th></tr></thead>
+        <tbody id="lanc"></tbody></table></div>
+      <p class="sublabel">Sous 1 % du mix à 8 semaines → on kill. De 1 à 3 % → on attend si la
+      tendance monte, on tranche sinon. Au-dessus de 3 % → on garde.</p>
+    </div>
+  </div>
+  <h3 class="mini">Produits en chute</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Produit</th><th class="n">Juin</th><th class="n">Juil</th><th class="n">Août</th>
+      <th class="n">Évolution</th></tr></thead>
+    <tbody id="dec"></tbody></table></div>
+  <p class="sublabel">La catégorie <b>SOIR</b> a fait 10 € en juillet et 10 € en août : l'offre du soir
+  est morte, pas en difficulté. <b>FORMULE TOAST</b> tombe à zéro parce qu'elle a été remplacée par
+  <b>FORMULE SALÉ</b>. À noter : « OEUF À LA COQUE » et « Oeuf à la coque » sont deux fiches distinctes
+  dans le catalogue Square, ce qui divise leurs ventes en deux.</p>
+</section>
+
+<section>
+  <div class="shead"><h2>Ateliers</h2><span class="sub">chantier en cours</span></div>
+  <div class="wip">
+    <span class="wipbadge">⚠ Work in progress — chiffres non fiables</span>
+    <div class="wipwhy">
+      <p style="margin:0"><b>Ce bloc ne doit pas servir à décider tant que ces trois points ne sont pas réglés.</b></p>
+      <ul>
+        <li><b>Trois mois manquants.</b> Les versements Wecandoo de février, avril et mai 2026
+        sont introuvables dans la boîte mail. Ces mois sont sous-estimés et leur part « direct »
+        est mécaniquement fausse — sur mai elle affiche 94 %, ce qui n'a aucun sens.</li>
+        <li><b>Pas de taux de remplissage.</b> C'est l'indicateur qui compte pour ce pôle, et la
+        jauge n'est disponible ni dans Wecandoo par mail, ni ailleurs. Il faut un export du
+        back-office Wecandoo pour l'obtenir.</li>
+        <li><b>Part Shopify estimée.</b> Le CA Shopify mélange ateliers et café vendu en ligne ;
+        la répartition est une estimation à partir du poids des deux produits « Atelier » sur 13 mois,
+        pas un chiffre lu.</li>
+      </ul>
+      <p style="margin:10px 0 0">Ce qui est affiché ci-dessous vient des versements réellement reçus,
+      donc nets de commission. C'est juste pour les mois complets, faux pour les trois mois signalés.</p>
+    </div>
+    <div class="wipbody">
+      <div class="chart" id="chatl"></div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--roast)"></i>Wecandoo</span>
+        <span><i class="sw" style="background:var(--warn)"></i>Funbooker</span>
+        <span><i class="sw" style="background:var(--green)"></i>Shopify (direct, sans commission)</span>
+        <span style="color:var(--crit)">! versement manquant</span>
+      </div>
+      <div class="tbl"><table>
+        <thead><tr><th>Mois</th><th class="n">Wecandoo</th><th class="n">Funbooker</th>
+          <th class="n">Shopify</th><th class="n">Total net</th><th class="n">% direct</th><th></th></tr></thead>
+        <tbody id="atl"></tbody></table></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="shead"><h2>Poisso</h2><span class="sub">soft launch le 23/09/2026</span></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Chantier</th><th>Statut</th></tr></thead>
+    <tbody id="poisso"></tbody></table></div>
+  <p class="sublabel">Terrah Poissonnière est une société distincte : le comptable demande de bien
+  séparer fournisseurs et raisons sociales sur les factures dès maintenant. Le pôle apparaîtra
+  dans la vue d'ensemble à l'ouverture.</p>
+</section>
+
+<section>
+  <div class="method">
+    <h3>Méthode, sources et limites</h3>
+    <ul>
+      <li><b>Axonaut</b> — export de factures reclassé dans le navigateur, sans perte de ligne.
+      Récurrent = consommables, thés, locations de machines, forfaits d'entretien, contrats de
+      maintenance, filtration, emballages. Ventes = machines, installations, livraisons refacturées,
+      café vert, ateliers et formations facturés en B2B, apports d'affaires. Les soldes et avoirs
+      sont isolés dans une ligne « ajustements » pour ne polluer aucun pôle.</li>
+      <li><b>Ventes machines en leasing</b> — une même machine passe par deux ou trois factures :
+      facturée au client, annulée par avoir, refacturée au loueur (Sogelease, BPCE Lease). Le net
+      annuel est juste, mais une période isolée peut être négative quand l'avoir et la refacturation
+      tombent de part et d'autre d'une fin de mois. C'est pourquoi les ventes restent sur une ligne
+      séparée du récurrent.</li>
+      <li><b>Square</b> — CA net hors taxes, un passage = un ticket, relevé jour par jour, ce qui
+      permet les trois granularités. Figé à la date de génération.</li>
+      <li><b>Clients actifs, relances et impayés</b> — calculés à la date de la dernière facture
+      présente dans l'export, pas à la date du jour. Ils ne dépendent pas de la période choisie.</li>
+      <li><b>Rythme de commande</b> — médiane des intervalles entre commandes, clients de moins de
+      3 commandes exclus. Seuils repris de la page farming : 0,86× à relancer, 1× risque de churn,
+      3× considéré comme perdu.</li>
+    </ul>
+  </div>
+</section>
+
+</div>
+
+<script>const DATA = {"epoch":"2025-01-01","genere":"2026-09-04","clients":["A table","ADC SAS","ADELYA TERRE D'HYGIENE","Allday","Amalthée","Amos Cafe","Arkwood","Art'Lunnch","Association THSN","Attal & Associes, Notaires Associes","BREMART","BSurprises","Bagel Corner","Bake and Blend","Bakers","Barista Gallery","Bctg Avocats Aarpi","Bistrot Rougemont (SAS Andrea)","Boneshaker","Book Nook","Braun Notes","Breteuil","Brown Coffee Shop","Buzzman","CARANGELO MARC","CFA ITIS","Caducée","Cafet'o Clamart","Café Méricourt","Café San Francisco","Canoune","Casa café","Cerca","Cesam-Treuil","Chez Achille","Ciao Paulette","Colisée Family Office","Converteo","Cook Invest","Coutot-Roehrig","Crystal Hotel","Cse Bpce Lease","Curiosa Films","DICE Caffe","Dingue de Lunettes","Edflex","FECA","Finexsi","FlixBus","Fluffy’s","Foodflow","Forezia","Forum ESTP","Freeland Management Services","Frnchlovebread","Galette","Golosa","Gregory Bouveyron","Gutsa (Beige Café)","Hark Group","Horeto-paris","Ida","Ingencia","Inskip","Isciacus","Joho (Act to Bear)","Journey","Kafé","Kalys","Kano Republique","Keen Je","Kiji","Klimb Group","Korint","La Crema","La Datcha","La Montgolfière","Le Perco","Littler France","Loumiz","MATHIEU SA","MAYA SARL","MICHO","Madame Madame","Maison Fleuret","Malou","Marguerite","Martin Gross","Maurice Sfez Café","Maurice Ternes","Messika Carla","Moby Mobility","Moelleux Café","Momen","My Job Glasses","Nodaleto","Obelisque Immobilier","Oh vin Dieu","One Corner","One Dry Nugget (Delight)","Optima experts","Optimmo Energies","Ozi","Paillettes","Polycea","Polyflame","Proost","Reguida (Osmose Gym)","S!P","SAS Dim Sum Cantine (Onisuko)","SAS ELITA - BLU Café","SAS LKFM (Restaurant SAMA)","SAS MAISON COMPLICES","SELARL Alan Benoliel","STEF Biechler","Sephora","Simplébo","Sogelease France","Studio Nueve","Talent AtScale","Tarte Cosmetics France","Théo Voyageur Gourmand","WeWard","Yora Paris","Yora Sentier (rue du Caire)"],"factures":["17655956","17733802","17749226","17775678","17800010","17805690","17805818","17805964","17806044","17806112","17806376","17972454","17972738","17972798","17974244","17976410","17977316","17977872","18035370","18037774","18044936","18073140","18160026","18160326","18160356","18160394","18166114","18172424","18245222","18276456","18283456","18326528","18343942","18364954","18365338","18365498","18388924","18444334","18452274","18453762","18462436","18465996","18503188","18544614","18577988","18582404","18583830","18584034","18595998","18604300","18616320","18696472","18700360","18707142","18741962","18742238","18742284","18793956","18794116","18794130","18798196","18818964","18820416","18913328","18913398","19032844","19033022","19091796","19091912","19094264","19105496","19154028","19154270","19154622","19167816","19168096","19176708","19191920","19192396","19192498","19192788","19202828","19203022","19220856","19241080","19245796","19248642","19298818","19299718","19322330","19359736","19360828","19382182","19438146","19443860","19444102","19461622","19465834","19481376","19556276","19556504","19557686","19565280","19640102","19640632","19642444","19665376","19665412","19700538","19743346","19743746","19744402","19744522","19744646","19753074","19816182","19830108","19830256","19922546","19938500","20050928","20051084","20079446","20079688","20079946","20080010","20087000","20120212","20120222","20126246","20127978","20150282","20169384","20169500","20169614","20169714","20231916","20277856","20307532","20307930","20308070","20308366","20318836","20318934","20320546","20349424","20349852","20350800","20416574","20427790","20429550","20429614","20429706","20429884","20440990","20460930","20601238","20609244","20667574","20667760","20894378","20899308","20904914","20907364","20953138","20958680","20958736","20978032","20993042","21015688","21028800","21028952","21061182","21061904","21061970","21062038","21062106","21062270","21062412","21064392","21064742","21076850","21076882","21120518","21120676","21121026","21121982","21129314","21151280","21207186","21207298","21207546","21207690","21207798","21207882","21207960","21212838","21215780","21216152","21256850","21298828","21317724","21323860","21341358","21341570","21341838","21376094","21390704","21447576","21447742","21447892","21471556","21530074","21530216","21530364","21530454","21530830","21530884","21601140","21601226","21626606","21641404","21641486","21690572","21690698","21690778","21788648","21789190","21789698","21789802","21790024","21790326","21790444","21801912","21809610","21814616","21839612","21870160","21870232","21913450","21917140","21917190","21917228","21917264","21917926","21918024","21935492","21982686","21982766","21986480","21998008","22041086","22041138","22041142","22077888","22094892","22106026","22160804","22160996","22163380","22163422","22181882","22198844","22220838","22285340","22285464","22285518","22285838","22339892","22347190","22351176","22351544","22351746","22369434","22369522","22372282","22398730","22430556","22523922","22540684","22541050","22541146","22541268","22541684","22541740","22542606","22576750","22576798","22576822","22576934","22577256","22580014","22581168","22581310","22581370","22608004","22611068","22619466","22649022","22675450","22678512","22678910","22678938","22734812","22734884","22757326","22788710","22790508","22796640","22796754","22884116","22884204","22884912","22884996","22885174","22925874","22944480","22975388","22992930","23030524","23044346","23060176","23073970","23111334","23148882","23162434","23162480","23162490","23179056","23179190","23205418","23213132","23214276","23215086","23256796","23257750","23325818","23325932","23340372","23340506","23358342","23358556","23388178","23388236","23388320","23427400","23458062","23508158","23508360","23508422","23508532","23532888","23535004","23553296","23553458","23584690","23610682","23657968","23658096","23658650","23700872","23772296","23803388","23813782","23813924","23813982","23844614","23854488","23861104","23878448","23888348","23953450","23953526","23980140","24005762","24038478","24042998","24115652","24132390","24157662","24169042","24171636","24174418","24183154","24201080","24228254","24228668","24232706","24250962","24252510","24256298","24269436","24276830","24281812","24283728","24285680","24317012","24360636","24420506","24449250","24449732","24449778","24449824","24457052","24476072","24486572","24486984","24491278","24533724","24534024","24540788","24548774","24584410","24595550","24595630","24595950","24597038","24610296","24672906","24687602","24715848","24715908","24716212","24723092","24723250","24723412","24723456","24723568","24736692","24852590","24911294","24911492","24913810","24913994","24914076","24914136","24953540","24953642","24953672","24983002","24983102","24983162","24983188","24983252","24998666","25040760","25085212","25087466","25088578","25088804","25114922","25115008","25115074","25115124","25115178","25120532","25135796","25135844","25135934","25136006","25137016","25145894","25154382","25155126","25158838","25159700","25163798","25203626","25203672","25360652","25361016","25373802","25398896","25451876","25476086","25493302","25514382","25521212","25522986","25536072","25537224","25542024","25562268","25603694","25604306","25604362","25606376","25628718","25631692","25653492","25784206","25784266","25826670","25826700","25832956","25843846","25843970","25882850","25887172","25928078","25929968","25930788","25950200","25968898","25969068","25969278","25987250","25987318","25987350","25994650","26024326","26027686","26031784","26048342","26061448","26061528","26089018","26090326","26095790","26095846","26183238","26215344","26223290","26223326","26231106","26235028","26273486","26323662","26333012","26396494","26441906","26454820","26473848","26484590","26507592","26542176","26542882","26542922","26678530","26691456","26691604","26691742","26691960","26692442","26692490","26692534","26692564","26692956","26758036","26760206","26760276","26760318","26761550","26806354","26814260","26818524","26818560","26818582","26818610","26818626","26818648","26819166","26819280","26839288","26849680","26864150","26909758","26913074","26916242","26933786","26999706","26999782","27035826","27057748","27068922","27068940","27075872","27077132","27102522","27102630","27104616","27124670","27253486","27262832","27264096","27274708","27317452","27336164","27349720","27350096","27363084","27367160","27367232","27375286","27382382","27383526","27385714","27407170","27439422","27485084","27490632","27498650","27498814","27533624","27534750","27534816","27534844","27543230","27578222","27578902","27579000","27583550","27584180","27584542","27606816","27611636","27655954","27703798","27703942","27703968","27704040","27705974","27707046","27707352","27710266","27737988","27742586","27801642","27810584","27811796","27816170","27898430","27898498","27952234","27971708","28006912","28044762","28171834","28172672","28178210","28247342","28289660","28295872","28325902","28326778","28346868","28347802","28358534","28385282","28385330","28439568","28465654","28468396","28468608","28497454","28514012","28533312","28555606","28662782","28663062","28666850","28676248","28676808","28693922","28697046","28710250","28710332","28720638","28721238","28740212","28798840","28798862","28802616","28802680","28846642","28857382","28857468","28870068","28895118","28922866","28928932","29008484","29092568","29092652","29092720","29096308","29105580","29119090","29122512","29125790","29131458","29141358","29164610","29209336","29221660","29221682","29283512","29326836","29330174","29331326","29360214","29373866","29387370","29402220","29406846","29406996","29407740","29420876","29435904","29440080","29459762","29467374","29471116","29472432","29483158","29510442","29515890","29516616","29558572","29558604","29559992","29569806","29576016","29635970","29636040","29637008","29663982","29665488","29668370","29675750","29769412","29769540","29769580","29830760","29857624","29858890","29861372","29880226","29880308","29927896","29952466","29954400","29960030","29970444","29991320","29991366","29991414","29991474","29999362","30004784","30080134","30104766","30139566","30146494","30176954","30183520","30186218","30190966","30191010","30224774","30245084","30253732","30284452","30293412","30306052","30334838","30334948","30373608","30402348","30402400","30433798","30433852","30436998","30477724","30477774","30482668","30503356","30503408","30517894","30540788","30592250","30598300","30625302","30635074","30645368","30684532","30717180","30737104","30739700","30805670","30843826","30843930","30868568","30895440","30937718","30940356","30943902","30948274","30968408","30968456","30968584","30980268","31037138","31037186","31037210","31041698","31045652","31046790","31069054","31076904","31077162","31077228","31077280","31082784","31084362","31085702","31085780","31136334","31145102","31150800","31162488","31253178","31257874","31269156","31280138","31293372","31319828","31358024","31377312","31377470","31377508","31377572","31377636","31382670","31396916","31434360","31434484","31473060","31521284","31521346","31530082","31534142","31534586","31592560","31617912","31619860","31665952","31665992","31666046","31670496","31670624","31670668","31671712","31673794","31680906","31694278","31694404","31694738","31694780","31700292","31730262","31730286","31730364","31742382","31742764","31742994","31743204","31799536","31832090","31838678","31888862","31888900","31916484","31948218","31957570","31993488","31996728","32009424","32009496","32011294","32018918","32062812","32071346","32097190","32122348","32131356","32133812","32150244","32150286","32152878","32180148","32194206","32203636","32203876","32204386","32208310","32208416","32208436","32243914","32276792","32276860","32278160","32282146","32296594","32344504","32351076","32392568","32393370","32403994","32404008","32404056","32404060","32404378","32404400","32418578","32434220","32464332","32467684","32471894","32475176","32519102","32519972","32520036","32520136","32520170","32562850","32567620","32567662","32570010","32570570","32596008","32597682","32598064","32599836","32602640","32613326","32635974","32665228","32742602","32742664","32742704","32774572","32784532","32784598","32790618","32790630","32790698","32791466","32797358","32802252","32802382","32802452","32802512","32842532","32849520","32866842","32866878","32948406","32951008","32951396","32952016","32952362","32961512","32986090","32990650","33070374","33074484","33085406","33089104","33101052","33119512","33129250","33140334","33230874","33230932","33231334","33231450","33231590","33231758","33231850","33232046","33247108","33305366","33340072","33343440","33344376","33344408","33381950","33382752","33382798","33426784","33459326","33471998","33493264","33493384","33502386","33513788","33515466","33536122","33588358","33659304","33659340","33672482","33688292","33693570","33693830","33694184","33694324","33753438","33788406","33789330","33789582","33793202","33799648","33850634","33876522","33882668","33938424","33939452","33941038","34018952","34020454","34025468","34030762","34072972","34106412","34149148","34160400","34160582","34160636","34160720","34161568","34180648","34197754","34220716","34232776","34236358","34237178","34286928","34287006","34287064","34315448","34315662","34315992","34316054","34319028","34319080","34319358","34368862","34431732","34446480","34503590","34503794","34503832","34504240","34512764","34512934","34512952","34538296","34539868","34610962","34616180","34639900","34639974","34639996","34640022","34702494","34702524","34707884","34711180","34736974","34754276","34788050","34799690","34845896","34896084","34903416","34926454","34926498","34934912","34945906","34955176","35004430","35005420","35014904","35024620","35056584","35068342","35071150","35115496","35121332","35134820","35171498","35189866","35222994","35241888","35241998","35256450","35333160","35380076","35380160","35380192","35404350","35439562","35464084","35578374","35578468","35579274","35594426","35597900","35635382","35641324","35683012","35684316","35714086","35726760","35730852","35738984","35744204","35744320","35744374","35765948","35766100","35770308","35774626","35790872","35827218","35827496","35834892","35890314","35895696","35915696","35918054","35924776","35925664","35979284","35983634","36014330","36027472","36032294"],"ax":[[0,86,8700,0,13,0],[0,86,3500,0,13,0],[3,124,3900,0,27,1],[4,85,7900,0,15,2],[5,88,60000,0,70,3],[6,53,31500,0,70,4],[6,53,25200,0,70,4],[6,53,3160,0,70,4],[6,53,3800,0,70,4],[6,53,7600,0,70,4],[6,53,7600,0,70,4],[6,53,3600,0,70,4],[12,70,13800,0,23,5],[12,70,7200,0,23,5],[12,70,2600,0,23,5],[12,70,8700,0,23,5],[14,64,2000,0,27,6],[14,64,1000,0,27,6],[14,64,26100,0,27,6],[14,64,8550,0,27,6],[14,63,36000,0,27,7],[14,23,46200,0,27,8],[14,104,44100,0,30,9],[14,100,24300,0,117,10],[14,56,7200,0,27,11],[14,93,30000,0,27,12],[14,93,1300,0,27,12],[15,17,28800,0,-1,13],[15,85,25200,0,27,14],[15,85,12600,0,27,14],[15,97,24300,0,33,15],[15,116,25200,0,300,16],[15,116,-172,3,300,16],[15,13,5700,0,16,17],[15,13,2400,0,16,17],[15,13,0,0,16,17],[15,13,0,0,16,17],[15,99,8100,0,27,18],[15,99,8100,0,27,18],[15,99,0,0,27,18],[15,43,19440,0,16,19],[15,123,43500,0,63,20],[15,82,29880,0,27,21],[19,109,19800,0,166,22],[19,33,34500,0,48,23],[19,88,60000,0,70,24],[19,59,3500,0,114,25],[19,59,26100,0,114,25],[20,17,7900,0,-1,26],[20,70,21600,0,33,27],[20,70,8700,0,33,27],[20,70,1600,0,33,27],[20,70,600,0,33,27],[20,70,0,0,33,27],[21,23,19500,1,34,28],[21,23,14500,1,34,28],[21,23,0,0,34,28],[22,107,7200,0,168,29],[23,43,12960,0,174,30],[23,43,2340,0,174,30],[26,123,3900,0,63,31],[26,123,623100,1,26,32],[26,123,116157,1,26,32],[26,123,0,0,26,32],[26,123,55335,1,26,32],[26,123,9207,0,26,32],[26,123,0,1,26,32],[27,93,37500,0,40,33],[27,29,21600,0,-1,34],[27,29,5200,0,-1,34],[27,26,48300,0,40,35],[28,8,10500,0,34,36],[28,8,2000,1,34,36],[29,104,44100,0,43,37],[30,88,60000,0,70,38],[30,53,31500,0,35,39],[30,53,12600,0,35,39],[30,53,18900,0,35,39],[30,53,3160,0,35,39],[30,53,3800,0,35,39],[30,70,21600,0,41,40],[30,70,0,0,41,40],[30,82,37350,0,41,41],[31,86,8700,0,42,42],[31,86,3500,0,42,42],[33,17,7200,0,89,43],[33,17,600,1,89,43],[34,124,3900,0,267,44],[34,23,66000,0,47,45],[34,23,2400,1,47,45],[34,85,31500,0,47,46],[34,85,7200,0,47,46],[34,85,0,0,47,46],[34,111,7200,0,153,47],[34,123,52200,0,63,48],[34,57,16800,0,41,49],[34,57,2000,1,41,49],[35,85,7900,0,48,50],[36,109,19800,0,166,51],[36,0,23400,0,48,52],[36,48,21600,0,173,53],[36,119,1425,0,48,54],[36,119,1450,0,48,54],[36,119,600,1,48,54],[36,123,52200,0,63,55],[36,42,22500,0,64,56],[38,68,2000,1,49,57],[38,68,24300,0,49,57],[38,64,8700,0,49,58],[38,64,8550,0,49,58],[38,64,7200,0,49,58],[38,15,15600,0,49,59],[39,59,3500,0,114,60],[40,70,28800,0,51,61],[40,88,60000,0,97,62],[43,123,26100,0,63,63],[43,97,16200,0,82,64],[48,44,8700,0,50,65],[48,100,16200,0,117,66],[50,99,16200,0,62,67],[50,111,7200,0,153,68],[50,53,37800,0,70,69],[50,53,18900,0,70,69],[50,53,3800,0,70,69],[50,53,3800,0,70,69],[50,53,1900,0,70,69],[50,53,950,0,70,69],[50,53,2000,0,70,69],[51,17,7900,0,-1,70],[54,63,36000,0,65,71],[54,104,44100,0,70,72],[54,123,34800,0,104,73],[54,29,28800,0,292,74],[54,64,36000,0,65,75],[54,116,25200,0,69,76],[55,47,6900,0,68,77],[55,47,7200,0,68,77],[55,47,0,0,68,77],[55,47,5970,0,68,78],[55,26,48300,0,68,79],[55,26,0,0,68,79],[55,70,21600,0,68,80],[55,70,8700,0,68,80],[55,70,2600,0,68,80],[55,97,5600,1,69,81],[55,97,7600,1,69,81],[55,97,12640,0,69,81],[55,97,7840,1,69,81],[55,65,62961,1,51,82],[55,65,8366,1,51,82],[55,65,3550,1,51,82],[55,65,2512,1,51,82],[55,65,0,0,51,82],[55,65,5945,0,51,82],[55,65,0,1,51,82],[55,65,0,1,51,82],[55,65,0,0,51,82],[55,65,0,0,51,82],[56,46,21600,0,167,83],[57,123,3900,0,267,84],[57,123,5000,1,63,85],[57,112,548136,1,63,86],[57,112,16560,1,63,86],[57,112,21000,0,63,86],[57,112,0,0,63,86],[57,112,0,0,63,86],[57,112,0,0,63,86],[58,80,2700,0,121,87],[58,80,2400,0,121,87],[58,80,2850,0,121,87],[58,109,26400,0,166,88],[58,58,21600,0,169,89],[58,58,20000,1,169,89],[58,58,0,0,169,89],[59,59,3500,0,114,90],[59,86,8700,0,70,91],[59,86,3500,0,70,91],[59,47,1990,0,99,92],[62,124,3900,0,267,93],[62,23,66000,0,75,94],[62,97,16200,0,169,95],[62,93,30000,0,75,96],[62,36,14400,0,79,97],[63,85,7900,0,76,98],[65,111,7200,0,-1,99],[65,70,8100,0,76,100],[65,42,50,3,64,101],[65,90,7200,0,73,102],[65,90,0,0,73,102],[68,46,21600,0,-1,103],[68,46,-21600,0,167,104],[68,47,-1990,3,303,105],[69,70,24300,0,82,106],[69,88,60000,0,125,107],[70,47,20700,0,99,108],[71,46,7200,0,-1,109],[71,46,7800,0,-1,109],[71,46,7200,0,-1,109],[71,119,1425,0,83,110],[71,119,1450,0,83,110],[71,119,1450,0,83,110],[71,15,14400,0,381,111],[71,15,8550,0,381,111],[71,15,8700,0,381,111],[71,15,800,0,381,111],[71,15,400,0,381,111],[71,65,7200,0,118,112],[71,53,31500,0,106,113],[71,53,31500,0,106,113],[71,53,3600,0,106,113],[71,53,2850,0,106,113],[71,53,2700,0,106,113],[71,53,2700,0,106,113],[72,91,15000,0,78,114],[75,65,65000,1,93,115],[75,93,2600,0,86,116],[75,97,2600,0,82,117],[79,17,7900,0,-1,118],[79,109,26400,0,166,119],[82,97,24300,0,117,120],[82,97,2600,0,117,120],[82,80,21600,0,121,121],[82,80,23400,0,121,121],[82,80,2850,0,121,121],[82,80,600,0,121,121],[82,80,600,0,121,121],[82,80,600,0,121,121],[83,43,21600,0,84,122],[83,43,2600,0,84,122],[83,85,18900,0,96,123],[83,70,8100,0,96,124],[83,70,8700,0,96,124],[83,70,6900,0,96,124],[83,99,16200,0,96,125],[83,123,43200,0,104,126],[84,34,-22410,0,84,127],[84,34,-22410,0,84,128],[85,59,3500,0,114,129],[85,123,3900,0,106,130],[85,65,689039,1,93,131],[85,65,91554,1,93,131],[85,65,38850,1,93,131],[85,65,27488,1,93,131],[85,65,0,0,93,131],[85,65,65065,0,93,131],[85,65,0,1,93,131],[85,65,0,1,93,131],[85,65,0,0,93,131],[85,65,0,0,93,131],[86,88,60000,0,125,132],[86,70,13800,0,97,133],[86,58,14400,0,169,134],[86,65,41400,0,118,135],[86,65,2900,0,118,135],[89,17,7200,0,160,136],[90,86,8700,0,103,137],[90,86,3500,0,103,137],[90,23,66000,0,103,138],[90,26,34500,0,103,139],[90,26,16200,0,103,139],[90,116,25200,0,100,140],[90,73,21600,0,91,141],[90,104,44100,0,105,142],[90,29,21600,0,-1,143],[90,47,1990,0,191,144],[91,93,30000,0,104,145],[91,80,14400,0,121,146],[91,80,15600,0,121,146],[91,80,5700,0,121,146],[91,80,800,0,121,146],[91,80,800,0,121,146],[91,80,1200,0,121,146],[91,58,6000,1,175,147],[91,58,7900,1,175,147],[91,58,27000,1,175,147],[91,58,17000,1,175,147],[93,124,3900,0,267,148],[93,88,5000,0,154,149],[93,88,3000,1,154,149],[93,64,8700,0,104,150],[93,64,8550,0,104,150],[93,64,28800,0,104,150],[93,70,16200,0,104,151],[93,53,25200,0,125,152],[93,53,25200,0,125,152],[93,53,1900,0,125,152],[93,53,1800,0,125,152],[93,53,3300,0,125,152],[93,53,1878,0,125,152],[93,53,1900,0,125,152],[93,53,1740,0,125,152],[93,53,1000,0,125,152],[93,111,7200,0,250,153],[93,58,8700,0,-1,154],[94,85,7900,0,105,155],[98,62,3791,0,98,156],[98,112,36000,0,148,157],[98,112,15600,0,148,157],[98,112,1000,0,148,157],[98,112,1000,0,148,157],[98,112,1000,0,148,157],[98,112,8000,0,148,157],[98,112,5000,0,148,157],[100,88,60000,0,154,158],[100,80,21600,0,121,159],[100,80,23400,0,121,159],[100,80,11400,0,121,159],[100,80,1200,0,121,159],[100,80,0,0,121,159],[104,65,8700,0,118,160],[104,9,7200,0,90,161],[104,22,22500,0,173,162],[104,22,900,0,173,162],[104,22,800,0,173,162],[104,22,800,0,173,162],[104,22,1300,0,173,162],[104,22,8000,0,173,162],[104,120,180000,2,111,163],[106,19,36000,0,114,164],[106,19,12000,0,114,164],[106,19,0,0,114,164],[106,123,-3900,0,106,165],[106,123,-3900,0,303,166],[107,44,8700,0,111,167],[107,112,365424,1,125,168],[107,112,11040,1,125,168],[107,112,14000,0,125,168],[107,112,0,0,125,168],[107,112,0,0,125,168],[107,112,0,0,125,168],[110,17,7900,0,-1,169],[111,65,34500,0,155,170],[111,88,42000,0,154,171],[111,88,18000,0,154,171],[112,68,2000,1,125,172],[112,68,24300,0,125,172],[112,78,7500,0,146,173],[112,78,7800,0,146,173],[112,78,7200,0,146,173],[112,85,18900,0,125,174],[112,48,21600,0,173,175],[112,36,14400,0,124,176],[112,80,28800,0,121,177],[112,80,15600,0,121,177],[112,80,1200,0,121,177],[112,80,400,0,121,177],[112,82,37350,0,125,178],[112,83,14400,0,125,179],[112,97,24300,0,152,180],[112,97,2600,0,152,180],[112,88,18900,0,154,181],[112,35,6900,0,114,182],[112,35,5700,0,114,182],[114,70,24300,0,125,183],[114,70,400,0,125,183],[114,0,23400,0,125,184],[114,0,2900,0,125,184],[114,53,31500,0,135,185],[114,53,31500,0,135,185],[114,53,2400,0,135,185],[114,66,28800,0,-1,186],[114,59,10,3,114,187],[116,59,3500,0,183,188],[118,100,16200,0,250,189],[118,109,26400,0,-1,190],[118,104,44100,0,135,191],[118,22,22500,0,173,192],[118,22,1450,0,173,192],[118,29,21600,0,-1,193],[118,111,7200,0,-1,194],[118,47,20700,0,132,195],[118,33,36000,0,316,196],[118,123,26100,0,170,197],[118,123,34800,0,170,198],[119,57,16800,0,133,199],[119,57,2000,1,133,199],[120,86,8700,0,132,200],[120,86,3500,0,132,200],[120,47,1990,0,132,201],[120,88,60000,0,184,202],[120,88,4000,1,184,202],[121,23,66000,0,132,203],[121,88,18900,0,184,204],[121,112,50400,0,268,205],[123,124,3900,0,267,206],[124,85,7900,0,135,207],[125,65,39600,0,155,208],[125,65,8700,0,155,208],[125,70,16200,0,138,209],[125,83,8000,0,138,210],[126,123,3900,0,267,211],[128,26,48300,0,139,212],[128,80,28800,0,152,213],[128,64,7200,0,139,214],[128,63,36000,0,139,215],[128,88,60000,0,184,216],[128,88,1000,0,184,216],[128,19,50400,0,575,217],[132,59,17400,0,145,218],[132,98,6000,0,169,219],[132,98,1500,0,169,219],[133,22,22500,0,173,220],[133,22,1450,0,173,220],[133,22,24000,0,173,220],[133,29,21600,0,-1,221],[133,123,26100,0,170,222],[133,123,5000,0,170,222],[135,109,26400,0,-1,223],[135,70,24300,0,146,224],[135,70,2900,0,146,224],[135,70,2600,0,146,224],[135,66,21600,0,-1,225],[135,66,2900,0,-1,225],[139,116,25200,0,159,226],[139,53,31500,0,182,227],[139,53,31500,0,182,227],[139,53,3600,0,182,227],[139,53,5000,0,182,227],[139,53,3800,0,182,227],[139,30,7800,0,149,228],[139,64,28800,0,152,229],[139,80,21600,0,152,230],[139,80,15600,0,152,230],[139,80,5358,0,152,230],[139,80,1000,0,152,230],[139,80,500,0,152,230],[139,80,800,0,152,230],[139,93,30000,0,152,231],[139,93,2600,0,152,231],[139,99,16200,0,152,232],[140,17,7900,0,-1,233],[140,66,2500,0,-1,234],[140,66,2000,0,-1,234],[140,83,109000,1,139,235],[140,83,0,1,139,235],[141,19,14400,0,153,236],[142,88,60000,0,184,237],[142,78,60000,0,177,238],[142,78,7200,0,177,238],[142,78,8700,0,177,238],[145,96,7200,0,202,239],[145,19,50400,0,156,240],[145,66,21600,0,147,241],[145,85,18900,0,156,242],[145,22,30000,0,173,243],[145,43,21600,0,147,244],[145,70,16200,0,156,245],[146,123,3900,0,267,246],[147,65,39600,0,232,247],[147,65,8700,0,232,247],[147,17,7200,0,-1,248],[147,47,20700,0,191,249],[147,95,250000,2,146,250],[149,7,8000,0,-1,251],[149,7,3000,0,-1,251],[149,88,60000,0,184,252],[149,88,60000,0,306,253],[151,86,8700,0,162,254],[151,86,3500,0,162,254],[151,47,1990,0,191,255],[152,59,3500,0,163,256],[153,29,21600,0,287,257],[153,104,44100,0,166,258],[153,35,15950,0,-1,259],[153,80,28800,0,168,260],[153,80,15600,0,168,260],[153,80,1500,0,168,260],[153,80,400,0,168,260],[154,124,3900,0,267,261],[154,83,14400,0,244,262],[154,83,16000,0,244,262],[155,85,7900,0,167,263],[156,70,16200,0,167,264],[156,23,33000,0,167,265],[156,23,39000,0,167,265],[156,36,14400,0,166,266],[156,66,28800,0,-1,267],[156,66,6000,1,-1,267],[160,22,30000,0,173,268],[160,22,1450,0,173,268],[160,22,24000,0,173,268],[160,109,26400,0,173,269],[160,114,7200,0,-1,270],[160,114,7800,0,-1,270],[160,113,7800,0,-1,271],[160,30,7800,0,575,272],[161,19,50400,0,174,273],[161,17,7200,0,-1,274],[161,68,2000,1,174,275],[161,68,24300,0,174,275],[162,88,42000,0,205,276],[162,88,18900,0,205,276],[163,70,16200,0,174,277],[167,65,65000,1,75,278],[168,64,28800,0,181,279],[168,64,8120,0,181,279],[168,64,15600,0,181,279],[168,80,21600,0,175,280],[168,80,23400,0,175,280],[168,80,200,0,175,280],[168,56,14400,0,181,281],[168,112,43200,0,268,282],[168,112,7280,0,268,282],[168,76,14400,0,191,283],[168,76,14400,0,168,284],[168,76,-14400,0,168,285],[169,111,7200,0,-1,286],[169,82,37350,0,181,287],[169,82,37350,0,169,288],[169,26,48300,0,181,289],[169,82,-37350,0,169,290],[169,83,7200,0,244,291],[169,83,64000,0,244,291],[169,73,2400,0,175,292],[169,73,2600,0,175,292],[169,73,2700,0,175,292],[169,73,2800,0,175,292],[169,73,2900,0,175,292],[169,87,2400,0,169,293],[169,87,2700,0,169,293],[169,17,21600,0,181,294],[170,65,39600,0,232,295],[170,65,5600,0,232,295],[170,65,2700,0,232,295],[170,70,8100,0,181,296],[170,70,2700,0,181,296],[171,17,7900,0,182,297],[173,53,31500,0,215,298],[173,53,31500,0,215,298],[173,53,6300,0,215,298],[173,53,4500,0,215,298],[173,53,3800,0,215,298],[173,53,3800,0,215,298],[174,85,18900,0,187,299],[174,93,30000,0,187,300],[174,93,2600,0,187,300],[174,88,60000,0,205,301],[174,88,4200,1,205,301],[174,70,24300,0,187,302],[175,99,16200,0,188,303],[175,48,21600,0,202,304],[176,19,50400,0,188,305],[177,59,3500,0,183,306],[177,123,3900,0,267,307],[177,98,6000,0,217,308],[177,66,28800,0,-1,309],[180,116,25200,0,190,310],[180,47,20700,0,222,311],[180,33,28800,0,198,312],[180,83,14400,0,244,313],[180,83,0,0,244,313],[180,36,14400,0,188,314],[181,86,8700,0,194,315],[181,86,3500,0,194,315],[181,88,60000,0,246,316],[181,47,1990,0,222,317],[181,7,8000,0,-1,318],[182,30,15600,0,188,319],[182,30,1400,0,188,319],[182,30,350,0,188,319],[183,57,16800,0,202,320],[183,57,2000,1,202,320],[183,104,12600,0,195,321],[184,124,3900,0,268,322],[185,85,7900,0,196,323],[187,70,24300,0,198,324],[187,70,2700,0,198,324],[187,114,8100,0,189,325],[187,113,2800,0,-1,326],[187,103,623100,1,176,327],[187,103,116157,1,176,327],[187,103,0,0,176,327],[187,103,55335,1,176,327],[187,103,9207,0,176,327],[187,103,0,1,176,327],[188,23,33000,0,201,328],[188,23,39000,0,201,328],[188,104,31500,0,195,329],[189,78,30000,0,247,330],[189,78,31200,0,247,330],[189,78,16800,0,247,330],[189,43,28800,0,196,331],[189,112,64800,0,217,332],[189,112,6000,0,217,332],[189,112,16000,0,217,332],[189,83,-52000,0,244,333],[190,103,14400,0,271,334],[190,44,8700,0,191,335],[195,88,60000,0,246,336],[195,22,30000,0,208,337],[195,22,1450,0,208,337],[195,22,21000,0,208,337],[195,65,39600,0,232,338],[195,70,24300,0,208,339],[195,70,2700,0,208,339],[196,43,-28800,0,196,340],[196,43,27600,0,196,341],[197,19,50400,0,209,342],[197,109,26400,0,209,343],[197,66,21600,0,-1,344],[198,83,14400,0,244,345],[201,17,7900,0,212,346],[202,88,60000,0,246,347],[202,17,14400,0,215,348],[202,70,16200,0,215,349],[202,53,25200,0,232,350],[202,53,37800,0,232,350],[203,111,7200,0,-1,351],[203,121,40000,2,239,352],[204,85,18900,0,216,353],[204,59,17400,0,-1,354],[205,22,30000,0,216,355],[205,22,21000,0,216,355],[205,22,6000,0,216,355],[207,123,3900,0,267,356],[209,70,2700,0,222,357],[209,70,2900,0,222,357],[209,21,81000,0,317,358],[209,75,7200,0,303,359],[210,60,529021,2,-1,360],[212,86,8700,0,223,361],[212,86,3500,0,223,361],[212,47,1990,0,252,362],[212,123,26100,0,267,363],[212,36,14400,0,379,364],[212,70,16200,0,223,365],[215,124,3900,0,267,366],[215,19,50400,0,226,367],[215,65,13200,0,232,368],[215,65,2700,0,232,368],[216,85,7900,0,229,369],[216,83,14400,0,244,370],[218,70,24300,0,230,371],[218,88,60000,0,278,372],[218,88,2000,0,278,372],[219,104,31500,0,303,373],[222,104,12600,0,245,374],[223,26,48300,0,236,375],[223,26,6900,0,236,375],[223,26,6900,0,236,375],[224,59,3500,0,-1,376],[229,83,14400,0,244,377],[230,22,22500,0,243,378],[230,22,63000,0,243,378],[230,22,18000,0,243,378],[231,65,6600,0,-1,379],[231,65,2800,0,-1,379],[232,17,7900,0,244,380],[232,66,21600,0,-1,381],[232,66,2900,0,-1,381],[232,88,60000,0,308,382],[232,88,1235000,1,223,383],[232,88,0,1,223,383],[233,88,-50,3,205,384],[236,23,33000,0,247,385],[236,23,39000,0,247,385],[236,0,7800,0,247,386],[236,116,25200,0,246,387],[237,109,26400,0,250,388],[237,38,7200,0,250,389],[237,38,21000,0,250,389],[237,38,3000,0,250,389],[237,63,36000,0,250,390],[237,81,15600,1,251,391],[237,81,5800,1,251,391],[237,81,7500,0,251,391],[237,81,2200,1,251,391],[237,81,1300,1,251,391],[237,81,1500,1,251,391],[237,81,3000,1,251,391],[238,123,3900,0,267,392],[238,89,72000,0,252,393],[238,88,1235000,1,240,394],[238,88,0,1,240,394],[238,30,7800,0,575,395],[239,73,21600,0,533,396],[240,100,32400,0,250,397],[243,86,8700,0,254,398],[243,86,3500,0,254,398],[243,47,1990,0,271,399],[243,47,20700,0,271,400],[243,93,30000,0,254,401],[243,19,50400,0,254,402],[243,94,7800,0,258,403],[243,94,7200,0,258,403],[243,94,0,0,258,403],[244,59,3500,0,-1,404],[244,83,21600,0,244,405],[244,71,16200,0,545,406],[244,71,7800,0,545,406],[244,103,14400,0,271,407],[245,85,37800,0,258,408],[245,89,50400,0,252,409],[245,89,14400,0,252,409],[245,89,4000,0,252,409],[245,38,36000,0,258,410],[246,124,3900,0,267,411],[247,85,7900,0,258,412],[247,88,60000,0,308,413],[247,53,31500,0,268,414],[247,53,31500,0,268,414],[247,66,21600,0,-1,415],[247,70,24300,0,258,416],[247,70,2700,0,258,416],[247,11,41400,0,532,417],[251,81,-15600,1,251,418],[251,81,-5800,1,251,418],[251,81,-7500,0,251,418],[251,81,-2200,1,251,418],[251,81,-1300,1,251,418],[251,81,-1500,1,251,418],[251,81,-3000,1,251,418],[251,89,60000,0,308,419],[252,89,-12000,0,303,420],[252,89,-8400,0,303,421],[252,89,-1200,0,303,421],[252,89,-4000,0,303,421],[252,88,6600,0,-1,422],[252,112,43200,0,287,423],[252,112,7800,0,287,423],[252,76,14400,0,266,424],[252,22,30000,0,265,425],[252,22,1450,0,265,425],[252,22,63000,0,265,425],[252,22,12000,0,265,425],[252,22,900,0,265,425],[252,22,800,0,265,425],[252,22,1300,0,265,425],[252,82,37350,0,265,426],[252,89,114000,0,-1,427],[252,89,42000,0,-1,427],[253,28,7200,0,275,428],[258,65,14400,0,258,429],[258,65,2900,0,258,429],[259,111,7200,0,-1,430],[259,64,31200,0,272,431],[259,64,14400,0,272,431],[259,64,14400,0,272,431],[259,70,8100,0,272,432],[259,70,14400,0,272,432],[259,70,8700,0,272,432],[259,88,60000,0,308,433],[259,99,16200,0,272,434],[259,48,21600,0,265,435],[260,66,21600,0,-1,436],[260,36,14400,0,264,437],[260,36,900,0,264,437],[260,36,1250,0,264,437],[260,36,1000,0,264,437],[260,36,900,0,264,437],[260,36,1000,0,264,437],[260,36,900,0,264,437],[260,36,800,0,264,437],[260,36,1300,0,264,437],[260,19,21600,0,272,438],[260,19,7200,0,272,438],[260,19,2900,0,272,438],[260,19,2800,0,272,438],[261,26,48300,0,272,439],[261,26,3920,0,272,439],[261,26,8400,0,272,439],[261,30,7200,0,278,440],[261,70,14400,0,272,441],[261,65,13200,0,-1,442],[261,38,21600,0,272,443],[263,17,7900,0,274,444],[265,88,60000,0,308,445],[266,120,95000,2,285,446],[266,120,19600,1,285,446],[266,120,10400,0,285,446],[266,120,2000,1,285,446],[266,53,117000,0,301,447],[266,53,140400,0,301,448],[266,53,169200,0,301,449],[267,22,37500,0,279,450],[267,78,75000,0,303,451],[267,78,2500,0,303,451],[267,78,900,0,303,451],[267,78,900,0,303,451],[267,104,44100,0,-1,452],[267,116,25200,0,278,453],[267,23,33000,0,279,454],[267,23,39000,0,279,454],[267,14,21600,0,287,455],[267,14,7800,0,287,455],[267,14,24000,0,287,455],[268,109,19800,0,279,456],[268,103,28800,0,404,457],[268,123,28800,0,405,458],[268,44,17400,0,268,459],[268,89,60000,0,-1,460],[268,89,24000,0,-1,460],[268,19,50400,0,279,461],[268,10,198700,1,441,462],[268,83,38000,0,287,463],[269,59,3500,0,-1,464],[269,123,3900,0,267,465],[269,38,14880,0,280,466],[271,123,26100,0,405,467],[271,93,30000,0,282,468],[273,47,1990,0,313,469],[273,47,20700,0,313,470],[273,70,24300,0,286,471],[274,104,16400,0,287,472],[275,66,21600,0,-1,473],[275,66,2900,0,-1,473],[276,124,3900,0,405,474],[277,85,7900,0,288,475],[278,103,21600,0,404,476],[278,22,45000,0,289,477],[278,22,1450,0,289,477],[278,22,42000,0,289,477],[278,22,6000,0,289,477],[278,83,21600,0,291,478],[278,88,-60000,0,303,479],[278,94,1000,0,291,480],[278,94,7200,0,291,480],[278,94,800,0,291,480],[278,94,900,0,291,480],[278,94,3200,1,291,480],[278,94,10500,0,291,480],[278,94,4800,1,291,481],[278,94,4400,2,291,481],[278,94,4000,2,291,481],[278,94,900,0,291,481],[278,94,1000,0,291,481],[278,94,800,0,291,481],[279,53,31500,0,288,482],[279,53,31500,0,288,482],[279,53,2700,0,288,482],[279,53,1800,0,288,482],[279,53,5200,0,288,482],[280,89,60000,0,335,483],[280,112,43200,0,295,484],[280,112,7800,0,295,484],[280,112,6000,0,295,484],[280,123,34800,0,405,485],[280,123,1250,0,405,485],[280,123,1000,0,405,485],[280,123,1300,0,405,485],[280,38,14400,0,293,486],[280,38,16000,0,293,486],[281,19,50400,0,293,487],[281,4,50400,0,296,488],[281,4,2900,0,296,488],[281,70,21600,0,293,489],[286,0,7800,0,299,490],[286,0,2900,0,299,490],[286,66,21600,0,-1,491],[287,71,17400,0,545,495],[287,71,15400,0,545,495],[287,71,7800,0,545,495],[287,14,24000,0,302,496],[287,88,60000,0,308,492],[287,89,60000,0,335,493],[287,55,115000,1,302,494],[287,55,28800,0,302,494],[287,55,2900,0,302,494],[287,55,16000,0,302,494],[287,55,2200,0,302,494],[289,11,41400,0,315,497],[289,36,7200,0,293,498],[289,36,7200,0,293,498],[289,36,7200,0,293,498],[292,86,8700,0,303,499],[292,86,3500,0,303,499],[292,116,25200,0,308,500],[292,85,18900,0,303,501],[292,85,18900,0,303,501],[292,38,14400,0,303,502],[293,64,28800,0,306,503],[293,22,37500,0,306,504],[293,22,1450,0,306,504],[293,22,21000,0,306,504],[293,22,12000,0,306,504],[293,19,28800,0,306,505],[293,19,23400,0,306,505],[294,99,16200,0,307,506],[294,104,44100,0,-1,507],[294,26,48300,0,307,508],[294,70,24300,0,307,509],[294,70,8700,0,307,509],[294,70,1450,0,307,509],[295,93,30000,0,307,510],[295,93,2900,0,307,510],[295,110,21600,0,295,511],[295,110,23400,0,295,511],[295,110,24000,0,295,511],[295,110,2000,0,295,511],[295,110,5000,0,295,511],[295,110,0,0,295,511],[295,110,5800,0,295,511],[295,110,900,0,295,511],[295,110,1000,0,295,511],[295,110,800,0,295,511],[295,110,900,0,295,511],[295,110,3500,0,-1,512],[296,109,33000,0,307,513],[296,66,21600,0,-1,514],[296,89,60000,0,335,515],[299,59,3500,0,310,516],[299,123,3900,0,407,517],[299,23,33000,0,310,518],[299,23,39000,0,310,518],[299,68,2000,1,310,519],[299,68,24300,0,310,519],[301,47,20700,0,343,520],[302,14,21600,0,317,521],[302,22,37500,0,314,522],[302,70,24300,0,314,523],[302,70,1000,0,314,523],[302,70,400,0,314,523],[302,88,36000,0,-1,524],[302,83,28800,0,317,525],[303,59,8700,0,-1,526],[304,47,1990,0,379,527],[304,104,16400,0,321,528],[306,19,23400,0,317,529],[306,19,23400,0,317,529],[306,19,8700,0,317,529],[307,124,3900,0,405,530],[307,78,52500,0,320,531],[307,78,23400,0,320,531],[307,78,3750,0,320,531],[307,78,2700,0,320,531],[307,78,1600,0,320,531],[307,78,1600,0,320,531],[307,52,147000,2,301,532],[308,85,7900,0,321,533],[308,2,7200,0,-1,534],[309,66,28800,0,-1,535],[309,66,2900,0,-1,535],[309,24,7200,0,310,536],[309,55,28800,0,324,537],[309,55,0,0,324,537],[315,38,14400,0,328,538],[315,64,36000,0,328,539],[315,64,7800,0,328,539],[315,64,7800,0,328,539],[315,64,8400,0,328,539],[315,57,16800,0,324,540],[315,57,2000,1,324,540],[315,107,7200,0,323,541],[315,110,21600,0,-1,542],[315,110,10500,0,-1,542],[315,53,31500,0,334,543],[315,53,31500,0,334,543],[315,53,2700,0,334,543],[315,53,5400,0,334,543],[315,112,43200,0,330,544],[315,112,7800,0,330,544],[315,112,6000,0,330,544],[315,48,21600,0,327,545],[315,76,14400,0,327,546],[315,11,20700,0,467,547],[317,39,0,0,345,548],[317,39,0,0,345,548],[317,39,7200,0,345,548],[317,39,7800,0,345,548],[317,39,0,0,345,548],[317,39,0,0,345,548],[317,70,24300,0,328,549],[317,70,2900,0,328,549],[317,4,43200,0,332,550],[317,104,56700,0,432,551],[317,14,10000,2,332,552],[320,105,249000,1,335,553],[320,105,149000,1,335,553],[320,105,32000,0,335,553],[320,105,2200,0,335,553],[320,105,21600,0,335,553],[320,105,2000,1,335,553],[320,25,21600,0,333,554],[320,25,2000,1,333,554],[320,38,21600,0,331,555],[320,14,41400,0,333,556],[320,26,48300,0,331,557],[320,73,21600,0,329,558],[320,0,7800,0,331,559],[320,19,21600,0,331,560],[320,19,23400,0,331,560],[320,22,37500,0,331,561],[320,22,1450,0,331,561],[320,22,42000,0,331,561],[320,22,12000,0,331,561],[320,54,66000,0,344,562],[321,33,36000,0,348,563],[321,74,406200,1,321,564],[321,74,134000,1,321,564],[321,74,97750,1,321,564],[321,74,47250,1,321,564],[321,74,299000,1,321,564],[321,74,37250,1,321,564],[322,123,34800,0,407,565],[323,103,43200,0,404,566],[323,56,14400,0,335,567],[323,70,24300,0,335,568],[323,70,8700,0,335,568],[324,122,35000,1,330,569],[324,122,10000,0,330,569],[324,122,5000,0,330,569],[327,99,16200,0,338,570],[327,23,33000,0,338,571],[327,23,39000,0,338,571],[328,36,14400,0,341,572],[328,36,2000,1,341,572],[329,19,23400,0,342,573],[329,19,23400,0,342,573],[329,116,25200,0,343,574],[329,55,21600,0,344,575],[329,55,0,0,344,575],[330,59,3500,0,342,576],[330,123,3900,0,407,577],[330,110,21600,0,-1,578],[330,110,9900,0,-1,578],[330,63,24000,0,342,579],[330,105,28800,0,345,580],[330,105,2000,1,345,580],[331,66,21600,0,-1,581],[334,14,48000,0,347,582],[334,22,37500,0,345,583],[334,22,26700,0,345,583],[334,47,1990,0,379,584],[334,104,16400,0,348,585],[335,79,37500,0,-1,586],[335,79,13500,0,-1,586],[335,79,3500,0,-1,586],[335,79,2700,0,-1,586],[335,79,2400,0,-1,586],[335,79,5800,0,-1,586],[336,70,16200,0,349,587],[336,100,32400,0,-1,588],[336,11,20700,0,467,589],[337,124,3900,0,-1,590],[337,93,37500,0,349,591],[337,93,37500,0,349,592],[337,47,20700,0,379,593],[337,39,7200,0,349,594],[337,39,7800,0,349,594],[337,39,0,0,349,594],[337,39,0,0,349,594],[337,39,900,0,349,594],[337,78,22500,0,352,595],[337,78,14400,0,352,595],[337,78,3200,0,352,595],[337,78,5000,0,352,595],[337,78,3200,0,352,595],[337,78,3600,0,352,595],[337,78,5400,0,352,595],[337,109,21600,0,349,596],[338,85,7900,0,349,597],[338,15,2900,0,-1,598],[338,15,2900,0,-1,598],[338,15,2900,0,-1,598],[341,94,800,0,354,599],[341,94,900,0,354,599],[341,94,1250,0,354,599],[341,94,1000,0,354,599],[341,19,31200,0,352,600],[341,19,7800,0,352,600],[341,19,8400,0,352,600],[341,19,8400,0,352,600],[341,44,8700,0,342,601],[341,44,8700,0,342,601],[341,38,14400,0,352,602],[342,123,34800,0,-1,603],[342,3,37500,0,349,604],[342,3,2500,0,349,605],[342,3,2500,0,349,605],[342,3,2600,0,349,605],[342,3,7500,0,349,606],[342,14,10000,2,355,607],[342,14,2000,1,355,607],[343,33,-21600,0,366,608],[343,33,21600,0,366,608],[343,33,3000,1,366,608],[343,1,10000,0,343,609],[343,1,1500,1,343,609],[343,23,7200,0,356,610],[343,85,37800,0,356,611],[343,53,31500,0,425,612],[343,53,31500,0,425,612],[343,53,900,0,425,612],[343,53,5400,0,425,612],[343,53,6000,0,425,612],[343,94,21600,0,358,613],[344,104,18900,0,369,614],[348,0,7800,0,363,615],[348,22,37500,1,363,616],[348,22,50900,1,363,616],[348,4,50400,0,366,617],[348,66,28800,0,-1,618],[348,64,43200,0,363,619],[348,59,8700,0,-1,620],[348,78,80000,1,366,621],[348,22,45000,0,363,622],[348,22,21000,0,363,622],[348,22,6000,0,363,622],[348,79,45000,0,-1,623],[348,79,10800,0,-1,623],[348,103,21600,0,478,624],[349,76,7200,0,534,625],[349,38,21600,0,363,626],[350,116,25200,0,362,627],[350,19,39000,0,363,628],[350,19,7800,0,363,628],[350,19,25200,0,363,628],[350,83,21600,0,363,629],[350,11,41400,0,467,630],[350,11,800,0,467,630],[350,11,1000,0,467,630],[352,74,406200,1,356,631],[352,74,134000,1,356,631],[352,74,97750,1,356,631],[352,74,47250,1,356,631],[352,74,299000,1,356,631],[352,74,37250,1,356,631],[352,74,24500,1,356,631],[352,74,10500,1,356,631],[352,74,27600,0,394,632],[352,74,7800,0,394,632],[352,74,8700,0,394,632],[352,74,2900,0,394,632],[355,54,66000,0,357,633],[356,14,62100,0,372,634],[357,20,7500,0,-1,635],[357,20,8100,0,-1,635],[357,20,7500,0,-1,635],[357,20,21000,0,-1,635],[357,20,5800,0,-1,635],[360,123,3900,0,-1,636],[362,83,21600,0,373,637],[362,83,600,0,373,637],[362,112,64800,0,380,638],[362,112,2600,0,380,638],[362,38,21600,0,373,639],[364,20,45000,0,-1,640],[365,47,1990,0,407,641],[365,104,16400,0,394,642],[366,79,45000,0,-1,643],[366,79,10800,0,-1,643],[366,83,21600,0,377,644],[366,83,21000,0,377,644],[368,124,3900,0,-1,645],[368,59,3500,0,379,646],[369,85,7900,0,380,647],[369,70,16200,0,380,648],[369,70,8700,0,380,648],[369,19,54600,0,380,649],[370,104,56700,0,394,650],[371,0,7800,0,384,651],[371,68,2000,1,384,652],[371,68,24300,0,384,652],[371,23,66000,0,384,653],[372,103,28800,0,478,654],[372,103,2700,0,478,654],[372,103,5800,0,478,654],[372,26,48300,0,384,655],[373,38,21600,0,384,656],[373,66,21600,0,-1,657],[373,66,5800,0,-1,657],[376,48,21600,0,387,658],[376,74,48300,0,400,659],[376,36,14400,0,393,660],[376,22,37500,0,387,661],[376,22,1450,0,387,661],[376,99,16200,0,387,662],[377,94,900,0,464,663],[377,94,800,0,464,663],[377,94,1250,0,464,663],[377,94,1000,0,464,663],[377,4,50400,0,464,664],[377,94,14400,0,464,665],[377,47,20700,0,407,666],[378,105,21600,0,464,667],[378,105,0,0,464,667],[378,105,2000,1,464,667],[378,79,45000,0,391,668],[378,79,10800,0,391,668],[378,93,37500,0,391,669],[380,83,21600,0,391,670],[380,76,14400,0,534,671],[380,20,45000,0,464,672],[380,11,20700,0,467,673],[383,53,31500,0,414,674],[383,53,31500,0,414,674],[383,53,5400,0,414,674],[383,53,5400,0,414,674],[383,110,21600,0,-1,675],[383,110,900,0,-1,675],[383,110,1250,0,-1,675],[383,123,34800,0,407,676],[383,12,50400,0,401,677],[384,19,46800,0,397,678],[384,19,8400,0,397,678],[385,78,16088,0,464,679],[385,123,43200,0,-1,680],[387,83,21600,0,464,681],[390,116,25200,0,400,682],[390,63,18000,0,401,683],[390,66,28800,0,-1,684],[390,33,21600,0,456,685],[390,3,2500,0,392,686],[390,3,2600,0,392,686],[390,3,2500,0,392,686],[391,123,3900,0,-1,687],[391,59,3500,0,404,688],[391,37,72500,2,392,689],[391,37,27600,2,392,689],[391,37,42000,2,392,689],[391,23,33000,0,404,690],[391,23,39000,0,404,690],[391,79,37500,0,502,691],[391,79,10800,0,502,691],[391,79,7000,0,502,691],[392,26,48300,0,405,692],[393,22,45000,0,405,693],[393,22,1450,0,405,693],[393,36,-14400,0,393,694],[393,36,-14400,0,-1,695],[393,36,-2000,1,-1,695],[395,78,11250,0,464,696],[397,78,45000,0,464,697],[397,78,21600,0,464,697],[397,78,1600,0,464,697],[397,78,2500,0,464,697],[397,78,1600,0,464,697],[397,78,1800,0,464,697],[397,78,2700,0,464,697],[397,19,54600,0,408,698],[397,105,21600,0,464,699],[397,105,2000,1,464,699],[397,47,1990,0,468,700],[398,104,16400,0,408,701],[398,83,21600,0,464,702],[398,94,21600,0,464,703],[398,44,8700,0,399,704],[398,101,7200,0,464,705],[398,67,482363,1,401,706],[398,67,17250,1,401,706],[398,67,4950,1,401,706],[398,67,37500,1,401,706],[398,67,0,1,401,706],[398,67,47250,1,401,706],[398,67,10500,0,401,706],[399,124,3900,0,-1,707],[399,39,7200,0,415,708],[399,39,7800,0,415,708],[399,39,1000,0,415,708],[399,39,1000,0,415,708],[399,47,20700,0,468,709],[400,85,7900,0,412,710],[400,74,-2100,0,-1,711],[400,103,43200,0,411,712],[400,112,-6000,0,-1,713],[400,36,14400,0,414,714],[400,36,800,0,414,714],[400,36,1000,0,414,714],[401,20,22500,0,464,715],[401,20,5800,0,464,715],[401,20,21000,0,464,715],[401,54,66000,0,445,716],[401,38,21600,0,412,717],[404,74,46200,0,428,718],[404,70,16200,0,415,719],[404,104,56700,0,432,720],[404,83,28800,0,464,721],[404,12,21600,0,418,722],[406,70,2900,0,419,723],[406,110,21600,0,-1,724],[406,110,1000,0,-1,724],[406,110,900,0,-1,724],[406,110,800,0,-1,724],[406,110,2900,0,-1,724],[406,79,10800,0,502,725],[406,79,3800,0,502,725],[407,64,36000,0,419,726],[407,37,72500,2,427,727],[407,37,27600,2,427,727],[407,37,42000,2,427,727],[407,56,14400,0,419,728],[407,94,1000,0,-1,729],[407,94,900,0,-1,729],[407,94,1600,0,-1,729],[411,59,8700,0,422,730],[411,53,31500,0,440,731],[411,53,31500,0,440,731],[411,53,5400,0,440,731],[411,53,5400,0,440,731],[411,53,5400,0,440,731],[411,123,34800,0,-1,732],[413,4,50400,0,464,733],[414,20,30000,0,464,734],[414,20,21000,0,464,734],[414,70,24300,0,426,735],[414,22,45000,0,426,736],[414,22,1450,0,426,736],[414,22,3800,0,426,736],[415,83,21600,0,464,737],[415,14,48000,0,464,738],[415,14,21600,0,464,738],[418,0,7800,0,429,739],[419,33,21600,0,519,740],[419,6,30000,0,425,741],[419,6,0,0,425,741],[419,6,0,0,425,741],[419,55,36000,0,464,742],[419,55,2900,0,464,742],[419,51,616050,0,467,743],[420,36,14400,0,517,744],[420,85,37800,0,433,745],[420,93,30000,0,433,746],[420,93,2900,0,433,746],[420,23,33000,0,433,747],[420,23,39000,0,433,747],[420,11,20700,0,467,748],[420,99,16200,0,433,749],[422,12,36000,0,433,750],[423,78,11250,0,464,751],[424,47,1990,0,468,752],[424,104,16400,0,-1,753],[425,74,46200,0,428,754],[425,70,24300,0,436,755],[425,3,15600,0,-1,756],[425,19,70200,0,436,757],[425,19,54600,0,436,758],[426,83,28800,0,464,759],[426,101,7200,0,464,760],[427,11,12500,1,467,761],[427,103,21600,0,478,762],[428,85,7900,0,440,763],[428,3,7500,0,-1,764],[429,20,37500,0,464,765],[429,94,1000,0,464,766],[429,94,800,0,464,766],[429,94,900,0,464,766],[429,94,1250,0,464,766],[429,94,36000,0,464,766],[431,59,3500,0,442,767],[432,110,43200,0,-1,768],[432,48,21600,0,446,769],[433,71,10500,0,433,770],[433,71,8100,0,433,770],[433,105,21600,0,464,771],[433,105,2000,1,464,771],[433,112,43200,0,464,772],[433,112,1300,0,464,772],[434,116,25200,0,446,773],[434,4,50400,0,464,774],[434,5,964725,1,462,775],[434,5,34500,1,462,775],[434,5,9900,1,462,775],[434,5,0,1,462,775],[434,5,0,1,462,775],[434,5,94500,1,462,775],[434,5,21000,0,462,775],[434,5,0,1,462,775],[435,70,24300,0,447,776],[435,64,21600,0,447,777],[435,104,56700,0,540,778],[436,22,45000,0,447,779],[436,22,12000,0,447,779],[436,22,42000,0,447,779],[439,47,20700,0,468,780],[439,57,25200,0,455,781],[439,57,2000,1,455,781],[440,20,37500,0,464,782],[440,19,31200,0,453,783],[440,19,2900,0,453,783],[440,0,7800,0,453,784],[441,83,21600,0,464,785],[441,83,2900,0,464,785],[442,79,37500,0,502,786],[443,70,16200,0,454,787],[443,70,600,0,454,787],[443,78,52500,0,464,788],[443,78,21600,0,464,788],[443,78,4000,0,464,788],[443,78,6250,0,464,788],[443,78,4000,0,464,788],[443,78,4500,0,464,788],[443,78,5400,0,464,788],[446,59,8700,0,461,789],[447,23,66000,0,462,790],[447,83,28800,0,464,791],[448,115,145000,2,511,792],[448,115,69000,2,511,792],[449,15,122500,1,466,793],[449,22,45000,0,462,794],[449,22,4350,0,462,794],[449,74,46200,0,-1,795],[449,74,2900,0,-1,795],[449,11,20700,0,467,796],[449,38,1000,0,462,797],[449,38,2000,0,462,797],[449,38,900,0,462,797],[450,110,14400,0,-1,798],[450,110,2900,0,-1,798],[450,110,800,0,-1,798],[450,110,1250,0,-1,798],[450,70,16200,0,462,799],[450,70,2900,0,462,799],[450,123,34800,0,-1,800],[450,54,66000,0,475,801],[453,76,14400,0,534,802],[453,67,22500,0,481,803],[453,67,2900,0,481,803],[453,68,2000,1,464,804],[453,68,24300,0,464,804],[453,50,6525,0,468,805],[453,83,215000,1,-1,806],[453,83,29000,1,-1,806],[453,83,16000,0,-1,806],[453,83,9504,0,-1,806],[453,83,8160,0,-1,806],[453,118,7500,0,576,807],[454,78,11250,0,467,808],[454,3,15600,0,456,809],[454,19,23400,0,467,810],[454,19,26100,0,467,810],[454,19,24300,0,467,810],[454,20,45000,0,467,811],[454,105,21600,0,467,812],[454,105,2000,1,467,812],[454,53,31500,0,489,813],[454,53,31500,0,489,813],[454,53,5400,0,489,813],[454,53,5400,0,489,813],[454,53,3600,0,489,813],[454,99,16200,0,467,814],[454,67,482363,1,481,815],[454,67,17250,1,481,815],[454,67,4950,1,481,815],[454,67,37500,1,481,815],[454,67,0,1,481,815],[454,67,47250,1,481,815],[454,67,10500,0,481,815],[454,67,0,0,481,815],[454,67,0,0,481,815],[454,67,0,0,481,815],[454,67,-94500,1,575,816],[455,47,1990,0,496,817],[455,104,16400,0,566,818],[455,72,149000,2,455,819],[455,16,15000,0,475,820],[455,16,7500,0,475,820],[455,16,7800,0,475,820],[457,31,5800,0,460,821],[457,31,4000,0,460,821],[457,64,21600,0,468,822],[457,64,9600,0,468,822],[457,83,28800,0,477,823],[458,11,12500,1,532,824],[459,85,7900,0,470,825],[461,100,24300,0,-1,826],[462,5,-964725,1,462,827],[462,5,-34500,1,462,827],[462,5,-9900,1,462,827],[462,5,0,1,462,827],[462,5,0,1,462,827],[462,5,-94500,1,462,827],[462,5,-21000,0,462,827],[462,5,0,1,462,827],[462,36,14400,0,481,828],[462,36,501,3,481,828],[462,56,14400,0,475,829],[462,104,56700,0,482,830],[462,103,21600,0,464,831],[462,112,43200,0,477,832],[462,112,7800,0,477,832],[462,93,30000,0,475,833],[463,118,22500,0,471,834],[464,40,8700,0,467,835],[464,70,16200,0,475,836],[464,70,8700,0,475,836],[466,59,3500,0,477,837],[468,19,56700,0,481,838],[468,123,34800,0,-1,839],[468,44,8700,0,469,840],[468,14,72000,0,481,841],[468,6,30000,0,474,842],[470,11,20700,0,470,843],[471,83,28800,0,486,844],[471,83,1000,0,486,844],[471,64,28800,0,482,845],[474,5,964725,1,474,846],[474,5,34500,1,474,846],[474,5,9900,1,474,846],[474,5,0,1,474,846],[474,5,0,1,474,846],[474,5,94500,1,474,846],[474,5,21000,0,474,846],[474,5,0,1,474,846],[474,5,-964725,1,474,847],[474,5,-34500,1,474,847],[474,5,-9900,1,474,847],[474,5,0,1,474,847],[474,5,0,1,474,847],[474,5,-94500,1,474,847],[474,5,-21000,0,474,847],[474,5,0,1,474,847],[474,117,964725,1,513,848],[474,117,34500,1,513,848],[474,117,9900,1,513,848],[474,117,0,1,513,848],[474,117,0,1,513,848],[474,117,94500,1,513,848],[474,117,21000,0,513,848],[474,117,0,1,513,848],[474,74,66000,0,475,849],[474,116,25200,0,484,850],[474,20,48750,0,487,851],[474,20,5800,0,487,851],[474,20,24000,0,487,851],[474,78,11250,0,487,852],[474,78,5175,0,487,852],[474,78,10350,0,487,852],[474,23,66000,0,488,853],[474,70,24300,0,488,854],[475,40,8700,0,477,855],[475,26,48300,0,489,856],[475,74,-66000,0,475,857],[475,74,63000,0,575,858],[475,78,52500,0,491,859],[475,78,21600,0,491,859],[475,78,4000,0,491,859],[475,78,2500,0,491,859],[475,78,3600,0,491,859],[475,78,5400,0,491,859],[476,33,21600,0,411,860],[476,110,43200,0,-1,861],[476,0,7800,0,489,862],[476,94,36000,0,492,863],[476,94,1000,0,492,863],[476,94,800,0,492,863],[476,94,1000,0,492,863],[476,94,1000,0,492,863],[476,15,6600,0,492,864],[476,22,30000,0,489,865],[476,4,50400,0,492,866],[477,101,7200,0,464,867],[478,83,14400,0,493,868],[478,20,30000,0,493,869],[481,36,-14400,0,481,870],[481,36,-501,3,481,870],[481,36,14400,0,489,871],[481,36,-501,3,489,871],[482,19,23400,0,495,872],[482,19,16200,0,495,872],[482,19,8400,0,495,872],[483,47,20700,0,512,873],[483,103,21600,0,478,874],[484,49,7200,0,604,875],[484,54,66000,0,562,876],[484,54,6600,0,562,876],[484,54,7200,0,562,876],[484,54,2500,0,562,876],[484,39,7200,0,504,877],[484,39,7800,0,504,877],[484,39,900,0,504,877],[484,39,900,0,504,877],[484,39,800,0,504,877],[484,39,1000,0,504,877],[484,83,28800,0,499,878],[484,20,45000,0,499,879],[484,22,45000,0,496,880],[485,47,1990,0,512,881],[485,104,16400,0,496,882],[486,59,3500,0,-1,883],[488,11,12500,1,488,884],[488,53,31500,0,499,885],[488,53,31500,0,499,885],[488,6,30000,0,501,886],[488,99,16200,0,499,887],[488,70,16200,0,499,888],[488,70,2900,0,499,888],[488,16,15000,0,503,889],[488,16,7500,0,503,889],[488,16,7800,0,503,889],[489,85,7900,0,502,890],[489,14,14400,0,502,891],[489,53,-31500,0,489,892],[489,53,-31500,0,489,892],[489,53,-5400,0,489,892],[489,53,-5400,0,489,892],[489,53,-3600,0,489,892],[489,53,31500,0,-1,893],[489,53,31500,0,-1,893],[489,53,5400,0,-1,893],[489,53,5400,0,-1,893],[489,53,3600,0,-1,893],[489,105,21600,0,502,894],[489,105,2000,1,502,894],[489,3,826500,1,489,895],[489,3,54000,0,489,895],[489,3,68400,0,489,895],[489,3,96000,0,489,895],[489,3,-826500,1,489,896],[489,3,-54000,0,489,896],[489,3,-68400,0,489,896],[489,3,-96000,0,489,896],[489,3,413250,1,497,897],[489,3,27000,0,497,897],[489,3,34200,0,497,897],[489,3,48000,0,497,897],[490,55,28800,0,505,898],[490,55,2900,0,505,898],[491,83,28800,0,506,899],[491,40,8700,0,495,900],[491,16,2500,0,503,901],[491,16,2500,0,503,901],[491,16,2600,0,503,901],[491,16,150,0,503,901],[491,76,14400,0,534,902],[491,15,2800,0,506,903],[495,48,21600,0,506,904],[495,50,15225,0,509,905],[495,50,2325,0,509,905],[496,70,16200,0,509,906],[496,64,21600,0,509,907],[496,64,8400,0,509,907],[496,104,16400,0,496,908],[496,104,-16400,0,496,909],[496,104,16400,0,496,910],[496,104,-16400,0,496,911],[496,104,16400,0,510,912],[496,104,-16400,0,496,913],[497,19,81000,0,510,914],[497,102,45000,2,504,915],[497,102,30000,2,504,915],[497,102,6347,1,504,915],[497,102,1932,1,504,915],[497,102,0,2,504,915],[499,108,5000,0,499,916],[499,5,25200,0,575,917],[499,83,43200,0,514,918],[499,15,16200,0,514,919],[502,77,67500,0,504,920],[502,14,28800,0,515,921],[502,59,8700,0,513,922],[502,18,22500,0,515,923],[502,18,2900,0,515,923],[502,18,50,0,515,923],[502,93,30000,0,513,924],[503,23,66000,0,516,925],[503,3,7500,0,-1,926],[503,116,25200,0,513,927],[503,22,30000,0,516,928],[503,22,8100,0,516,928],[503,16,149000,1,511,929],[504,85,12600,0,517,930],[504,11,20700,0,532,931],[504,79,37500,0,573,932],[504,50,2325,0,516,933],[504,70,16200,0,517,934],[504,70,8700,0,517,934],[504,20,45000,0,519,935],[505,92,50400,0,540,936],[505,92,3200,0,540,936],[505,92,3100,0,540,936],[505,92,0,1,540,936],[506,112,43200,0,521,937],[506,112,7800,0,521,937],[510,4,50400,0,523,938],[510,74,63000,0,511,939],[510,74,2900,0,511,939],[510,74,50,0,511,939],[510,74,63000,0,-1,940],[510,74,2900,0,-1,940],[510,74,50,0,-1,940],[511,59,3500,0,524,941],[511,5,24000,0,576,942],[511,74,-63000,0,511,943],[511,74,-2900,0,511,943],[511,74,-50,0,511,943],[511,16,-149000,1,511,944],[511,16,149000,1,511,945],[511,47,20700,0,530,946],[511,70,64995,1,524,947],[511,18,22500,0,526,948],[511,83,64800,0,526,949],[511,44,8700,0,-1,950],[511,26,48300,0,524,951],[511,78,52500,0,526,952],[511,78,50400,0,526,952],[511,78,8000,0,526,952],[511,78,6250,0,526,952],[511,78,4000,0,526,952],[511,78,3000,0,526,952],[511,78,3000,0,526,952],[512,83,43200,0,527,953],[513,78,22500,0,528,954],[513,78,22500,0,528,954],[513,117,-964725,1,513,955],[513,117,-34500,1,513,955],[513,117,-9900,1,513,955],[513,117,0,1,513,955],[513,117,0,1,513,955],[513,117,-94500,1,513,955],[513,117,-21000,0,513,955],[513,117,0,1,513,955],[513,117,964725,1,560,956],[513,117,0,1,560,956],[513,117,0,1,560,956],[513,117,94500,1,560,956],[513,117,21000,0,560,956],[513,117,0,1,560,956],[516,47,1990,0,530,957],[516,70,16200,0,527,958],[516,104,56700,0,566,959],[516,36,14400,0,-1,960],[516,40,8700,0,516,961],[516,104,16400,0,533,962],[516,72,48000,2,525,963],[516,72,64000,2,525,963],[516,72,187500,2,525,963],[516,72,75600,0,525,963],[516,49,21600,0,-1,964],[518,105,21600,0,533,965],[518,105,2000,1,533,965],[518,20,52500,0,-1,966],[518,12,13500,0,530,967],[518,0,7800,0,531,968],[519,11,12500,1,532,969],[519,68,2000,1,531,970],[519,68,24300,0,531,970],[519,22,30000,0,531,971],[519,22,8100,0,531,971],[520,85,7900,0,531,972],[523,33,7200,0,546,973],[523,33,7200,0,546,973],[523,33,7200,0,546,973],[523,103,21600,0,579,974],[523,19,78300,0,534,975],[523,6,37500,0,536,976],[523,99,16200,0,534,977],[523,64,28800,0,534,978],[523,54,66000,0,533,979],[523,16,32500,0,538,980],[523,16,23400,0,538,980],[523,16,20000,0,538,980],[523,16,400,0,538,980],[523,16,1800,0,538,980],[523,53,31500,0,547,981],[523,53,31500,0,547,981],[525,18,15000,0,540,982],[525,18,1250,0,540,982],[526,14,43200,0,-1,983],[526,40,26100,0,527,984],[526,70,24300,0,538,985],[526,70,24300,0,546,986],[527,100,24300,0,-1,987],[527,5,25200,0,575,988],[527,110,43200,0,-1,989],[530,101,7200,0,543,990],[531,92,0,1,564,991],[531,92,45000,0,564,991],[531,92,3000,0,564,991],[531,11,20700,0,576,992],[532,36,14400,0,540,993],[532,0,7800,0,545,994],[532,3,413250,1,540,995],[532,3,27000,0,540,995],[532,3,34200,0,540,995],[532,3,48000,0,540,995],[532,61,22500,0,533,996],[532,22,30000,0,545,997],[532,22,8100,0,545,997],[533,19,54600,0,545,998],[534,50,6525,0,551,999],[537,69,960000,1,537,1000],[537,69,110000,1,537,1000],[537,69,45000,1,537,1000],[537,69,-960000,1,537,1001],[537,69,-110000,1,537,1001],[537,69,-45000,1,537,1001],[537,74,-598000,1,551,1002],[538,41,960000,1,576,1003],[538,41,110000,1,576,1003],[538,41,45000,1,576,1003],[538,123,26100,0,-1,1004],[538,5,25200,0,-1,1005],[538,5,0,0,-1,1005],[538,20,52500,0,-1,1006],[538,20,2900,0,-1,1006],[538,20,21000,0,-1,1006],[538,112,43200,0,551,1007],[538,112,7800,0,551,1007],[539,85,34900,1,552,1008],[540,84,55200,0,551,1009],[540,84,8400,0,551,1009],[540,84,5800,0,551,1009],[540,83,64800,0,555,1010],[540,57,25200,0,573,1011],[540,18,22500,0,555,1012],[540,4,50400,0,555,1013],[542,59,3500,0,553,1014],[544,78,22500,0,557,1015],[544,78,22500,0,557,1015],[544,55,21600,0,557,1016],[545,102,45000,2,547,1017],[545,102,30000,2,547,1017],[545,102,6348,1,547,1017],[545,102,1933,1,547,1017],[545,102,2184,2,547,1018],[545,102,2832,2,547,1018],[545,102,33630,2,547,1018],[545,102,12740,2,547,1018],[545,23,66000,0,558,1019],[546,32,22500,0,561,1020],[546,47,1990,0,559,1021],[546,105,21600,0,561,1022],[546,105,2000,1,561,1022],[546,104,16400,0,533,1023],[546,32,32000,0,561,1024],[546,32,5500,0,561,1024],[547,104,56700,0,540,1025],[548,22,30000,0,559,1026],[548,22,8100,0,559,1026],[548,85,37800,0,559,1027],[548,118,22500,0,576,1028],[548,59,8700,0,-1,1029],[548,5,25200,0,-1,1030],[548,5,14400,0,-1,1030],[548,5,5000,0,-1,1030],[548,18,15000,0,563,1031],[548,18,1250,0,563,1031],[549,11,12500,1,576,1032],[550,85,7900,0,561,1033],[551,49,21600,0,564,1034],[551,19,81000,0,562,1035],[551,84,-55200,0,551,1036],[551,84,-8400,0,551,1036],[551,84,-5800,0,551,1036],[551,84,55200,0,564,1037],[551,84,8400,0,564,1037],[551,84,5800,0,564,1037],[552,12,15456,0,-1,1038],[552,12,23184,0,553,1039],[552,12,23184,0,-1,1040],[553,76,14400,0,579,1041],[553,103,21600,0,565,1042],[553,74,-63000,0,575,1043],[553,47,20700,0,-1,1044],[553,64,21600,0,566,1045],[553,64,8400,0,566,1045],[553,84,69000,0,568,1046],[553,83,64800,0,568,1047],[554,12,23184,0,554,1048],[555,14,28800,0,570,1049],[555,14,48000,0,570,1049],[555,78,52500,0,570,1050],[555,78,21600,0,570,1050],[558,55,21600,0,571,1051],[558,70,32400,0,569,1052],[558,70,16200,0,569,1053],[558,70,8400,0,569,1053],[558,12,13500,0,588,1054],[558,22,30000,0,569,1055],[558,54,66000,0,579,1056],[558,54,6600,0,579,1056],[558,54,7200,0,579,1056],[558,54,2500,0,579,1056],[558,54,66000,0,579,1057],[560,18,22500,0,575,1058],[560,53,31500,0,547,1059],[560,53,31500,0,547,1059],[561,50,6525,0,572,1060],[561,50,2175,0,572,1060],[561,33,7200,0,576,1061],[561,33,8400,0,576,1061],[561,33,24300,0,576,1061],[562,12,23184,0,566,1062],[562,12,23184,0,-1,1063],[562,12,23184,0,574,1064],[562,12,23184,0,-1,1065],[565,83,64800,0,578,1066],[565,3,15600,0,567,1067],[565,12,23184,0,574,1068],[565,6,37500,0,578,1069],[566,110,43200,0,-1,1070],[567,51,616050,0,-1,1071],[568,16,30000,0,568,1072],[568,16,15600,0,568,1072],[568,16,30000,0,568,1072],[568,16,400,0,568,1072],[568,16,6000,0,568,1072],[568,116,25200,0,579,1073],[569,22,37500,0,580,1074],[569,22,2000,1,580,1074],[572,59,3500,0,583,1075],[572,83,215000,1,587,1076],[572,83,29000,1,587,1076],[572,83,16000,0,587,1076],[573,48,21600,0,597,1077],[573,18,22500,0,586,1078],[573,44,14400,0,574,1079],[573,55,-21600,0,-1,1080],[574,78,22500,0,-1,1081],[574,78,22500,0,-1,1081],[575,112,43200,0,-1,1082],[575,27,37500,0,578,1083],[575,83,64800,0,578,1084],[575,5,14400,0,-1,1085],[576,41,-960000,1,576,1086],[576,41,-110000,1,576,1086],[576,41,-45000,1,576,1086],[576,74,-49000,1,579,1087],[576,84,22500,0,591,1088],[576,84,9000,0,591,1088],[577,47,1990,0,-1,1089],[577,104,16400,0,-1,1090],[577,32,32000,0,-1,1091],[577,32,5500,0,-1,1091],[579,36,14400,0,334,1092],[579,36,800,0,334,1092],[579,36,900,0,334,1092],[579,36,1000,0,334,1092],[579,54,-66000,0,579,1093],[579,54,-6600,0,579,1093],[579,54,-7200,0,579,1093],[579,54,-2500,0,579,1093],[580,11,12500,1,-1,1094],[580,106,28800,0,593,1095],[580,105,21600,0,593,1096],[580,105,2000,1,593,1096],[581,85,7900,0,594,1097],[583,22,37500,0,594,1098],[586,4,50400,0,599,1099],[586,19,56700,0,597,1100],[586,18,22500,0,586,1101],[587,83,64800,0,600,1102],[589,15,2800,0,604,1103],[590,61,22500,0,-1,1104],[596,123,26100,0,-1,1105],[596,5,21600,0,-1,1106],[596,83,64800,0,-1,1107],[597,84,50400,0,575,1108],[597,112,43200,0,-1,1109],[597,112,7800,0,-1,1109],[600,49,21600,0,604,1110],[600,104,56700,0,-1,1111],[601,3,7500,0,-1,1112],[601,93,30000,0,-1,1113],[602,110,43200,0,-1,1114],[603,59,3500,0,-1,1115],[603,26,48300,0,-1,1116],[603,64,7200,0,604,1117],[603,70,40500,0,-1,1118],[603,70,8400,0,-1,1118],[603,70,2900,0,-1,1118],[603,18,22500,0,-1,1119],[603,14,28800,0,-1,1120],[603,14,48000,0,-1,1120],[604,53,31500,0,-1,1121],[604,53,31500,0,-1,1121],[604,53,5400,0,-1,1121],[604,53,5400,0,-1,1121],[604,53,3600,0,-1,1121],[604,19,56700,0,-1,1122],[604,99,16200,0,-1,1123],[604,40,500,0,-1,1124],[604,40,1000,0,-1,1124],[605,78,22500,0,-1,1125],[605,78,22500,0,-1,1125],[607,74,63000,0,-1,1126],[607,83,72000,0,-1,1127],[607,83,2000,1,-1,1127],[607,45,24300,0,-1,1128],[607,45,800,0,-1,1128],[607,45,1250,0,-1,1128],[607,45,800,0,-1,1128],[607,45,0,0,-1,1128],[608,47,1990,0,-1,1129],[608,104,16400,0,-1,1130],[608,112,7800,0,-1,1131],[608,112,24000,0,-1,1131],[608,112,6000,0,-1,1131],[608,32,32000,0,-1,1132],[608,32,5500,0,-1,1132],[608,69,28800,0,-1,1133],[608,118,500,0,-1,1134],[608,118,1000,0,-1,1134],[609,5,21600,0,-1,1135],[609,0,7200,0,-1,1136],[610,40,24300,0,-1,1137],[610,41,960000,1,-1,1138],[610,41,110000,1,-1,1138],[610,41,45000,1,-1,1138],[610,54,93600,0,-1,1139]],"sq":[[219,0,14],[220,44952,60],[221,34198,48],[222,68230,87],[223,68373,94],[224,55809,78],[225,56505,83],[226,69960,92],[227,64984,82],[228,73340,82],[229,83999,105],[230,64770,83],[231,74484,94],[232,64626,87],[233,69061,98],[234,84494,117],[235,67372,82],[236,54127,80],[237,70988,103],[238,48496,81],[239,59066,88],[240,68855,106],[241,88525,116],[242,92431,121],[243,71520,101],[244,61032,84],[245,66784,108],[246,84967,115],[247,83666,112],[248,131514,151],[249,102058,132],[250,76107,114],[251,77571,113],[252,73192,102],[253,72561,93],[254,98811,126],[255,117833,130],[256,124845,126],[257,70542,110],[258,81536,111],[259,64468,100],[260,90309,130],[261,83861,112],[262,121778,121],[263,128834,148],[264,95702,128],[265,73149,96],[266,72853,95],[267,81239,119],[268,78766,113],[269,116680,135],[270,110222,126],[271,64595,99],[272,83899,120],[273,71913,108],[274,108739,137],[275,95926,118],[276,135953,171],[277,139478,163],[278,95282,132],[279,84853,116],[280,61759,86],[281,76979,103],[282,92929,127],[283,108295,130],[284,115898,135],[285,80911,116],[286,69301,98],[287,68517,102],[288,74364,103],[289,89160,103],[290,119544,146],[291,138566,151],[292,76076,111],[293,74734,97],[294,85836,107],[295,101130,126],[296,105757,130],[297,139890,148],[298,135954,145],[299,81229,106],[300,76924,113],[301,66473,96],[302,102663,123],[303,71521,97],[304,116148,117],[305,131862,135],[306,79583,102],[307,59845,93],[308,68057,99],[309,72212,90],[310,94058,112],[311,135105,135],[312,127865,145],[313,104921,144],[314,121739,130],[315,47980,74],[316,41630,56],[317,80204,113],[318,107726,129],[319,169446,127],[320,80529,120],[321,68222,92],[322,54445,75],[323,65085,88],[324,83794,101],[325,171913,168],[326,116292,123],[327,63231,96],[328,61178,79],[329,81264,90],[330,95592,128],[331,91400,125],[332,157212,162],[333,145495,148],[334,69061,100],[335,66437,90],[336,82350,108],[337,68115,91],[338,93293,124],[339,168790,189],[340,126631,129],[341,67761,91],[342,61942,94],[343,65146,98],[344,80471,98],[345,87132,121],[346,115342,129],[347,136974,135],[348,72460,104],[349,55728,87],[350,63641,85],[351,48153,67],[352,99499,125],[353,121297,120],[354,93387,111],[355,77799,105],[356,85307,98],[357,56354,74],[358,57605,67],[359,71136,83],[360,85509,87],[361,76505,95],[362,119159,143],[363,118451,139],[364,91218,101],[365,92885,103],[366,127861,140],[367,131987,144],[368,91368,113],[369,58663,91],[370,67684,107],[371,62370,94],[372,65075,99],[373,75023,105],[374,123880,151],[375,148216,150],[376,57231,98],[377,69347,104],[378,51080,87],[379,73612,105],[380,72608,99],[381,149831,180],[382,127310,147],[383,72572,112],[384,75079,119],[385,77958,106],[386,84389,113],[387,98535,142],[388,148661,179],[389,141134,149],[390,68014,109],[391,85575,110],[392,70396,112],[393,91566,129],[394,81332,117],[395,131630,147],[396,125537,149],[397,79999,105],[398,61526,88],[399,72488,90],[400,68759,108],[401,74683,107],[402,132188,148],[403,107523,123],[404,78749,108],[405,76109,111],[406,65388,93],[407,73068,108],[408,81142,105],[409,140004,154],[410,126295,141],[411,74170,108],[412,66147,99],[413,73110,111],[414,80160,98],[415,93513,127],[416,215752,236],[417,112724,134],[418,71200,101],[419,69022,106],[420,53510,78],[421,60443,87],[422,85126,99],[423,144304,154],[424,119884,126],[425,80579,110],[426,70050,103],[427,70571,108],[428,55678,82],[429,82093,115],[430,135524,164],[431,101719,103],[432,67143,88],[433,79665,104],[434,64514,95],[435,64471,83],[436,95870,109],[437,129158,141],[438,95104,110],[439,81996,113],[440,62028,86],[441,79076,111],[442,69195,96],[443,68817,92],[444,110647,117],[445,107937,116],[446,67286,96],[447,89917,100],[448,83928,105],[449,133646,157],[450,97354,126],[451,162053,171],[452,141422,139],[453,86096,110],[454,79039,105],[455,76023,100],[456,80639,109],[457,83876,111],[458,130840,150],[459,116835,112],[460,90566,108],[461,68065,101],[462,68802,94],[463,86984,116],[464,85771,110],[465,132262,151],[466,121441,121],[467,79030,103],[468,75463,109],[469,80561,107],[470,73037,90],[471,73315,108],[472,93042,98],[473,93531,96],[474,81859,114],[475,69992,100],[476,89875,115],[477,54042,73],[478,61448,82],[479,104223,114],[480,74472,76],[481,50689,75],[482,72298,111],[483,66296,89],[484,64311,83],[485,127364,131],[486,70911,94],[487,119223,137],[488,62410,84],[489,70048,100],[490,80101,104],[491,60164,80],[492,88810,104],[493,94065,89],[494,85104,109],[495,61081,89],[496,64425,89],[497,68116,101],[498,100500,122],[499,87330,109],[500,99036,109],[501,98549,102],[502,65230,92],[503,71286,95],[504,68007,90],[505,63445,85],[506,70226,90],[507,85640,104],[508,90029,105],[509,91951,98],[510,59870,87],[511,66521,86],[512,711,1],[513,66596,88],[514,96477,104],[515,77510,99],[516,50726,68],[517,55504,84],[518,60467,83],[519,56988,78],[520,83448,102],[521,106484,117],[522,74775,90],[523,71511,78],[524,70984,101],[525,63297,92],[526,68091,86],[527,59299,85],[528,77700,90],[529,65267,89],[530,67302,85],[531,69624,98],[532,71506,85],[533,46306,70],[534,76954,95],[535,83060,102],[536,314500,312],[537,90775,109],[538,78775,102],[539,86223,115],[540,83579,113],[541,99383,131],[542,105787,115],[543,114455,130],[544,74021,102],[545,89665,113],[546,61527,85],[547,47253,67],[548,64628,80],[549,89555,93],[550,92111,99],[551,70104,92],[552,61063,79],[553,63560,86],[554,73616,89],[555,87387,102],[556,104218,110],[557,88858,94],[558,95248,103],[559,60758,78],[560,76876,90],[561,60165,74],[562,67764,79],[563,79177,78],[564,111855,82],[565,64971,78],[566,62741,74],[567,56127,74],[568,37259,54],[569,72544,85],[570,91505,77],[571,71545,81],[572,61970,78],[573,57827,64],[574,59569,67],[575,44569,63],[576,37118,57],[577,72649,79],[578,51901,62],[579,66780,79],[580,54235,78],[581,91149,89],[582,60952,69],[583,50642,71],[584,70683,81],[585,43153,52],[586,72113,92],[587,62320,80],[588,52439,72],[589,56013,62],[590,47080,60],[591,64863,73],[592,77272,86],[593,51492,75],[594,62171,68],[595,63840,79],[596,57049,59],[597,69153,77],[598,74057,82],[599,55595,66],[600,45074,65],[601,59520,72],[602,60701,64],[603,58460,73],[604,50916,61],[605,77493,80],[606,89998,97],[607,60748,83],[608,69041,84],[609,79907,102],[610,59686,85],[611,34542,58]],"atl":{"2025-07":[1218,0,0,false],"2025-08":[1386,0,0,false],"2025-09":[919,153,147,false],"2025-10":[1756,0,297,false],"2025-11":[1612,70,411,false],"2025-12":[1807,0,1432,false],"2026-01":[5793,129,793,false],"2026-02":[0,293,1338,true],"2026-03":[5010,437,550,false],"2026-04":[0,604,872,true],"2026-05":[0,86,1230,true],"2026-06":[2438,172,782,false],"2026-07":[1886,367,951,false],"2026-08":[968,172,562,false],"2026-09":[0,86,63,false]},"sqcat":{"2026-07":{"CAFE":9483.96,"AUTRES BOISSONS":4279.89,"SALE":2851.0,"Formule":2243.35,"SUCRE":2210.95,"GRAINS":616.23,"SOIR":10.0},"2026-08":{"CAFE":8583.4,"AUTRES BOISSONS":4185.86,"SALE":2362.14,"SUCRE":1905.22,"Formule":1690.52,"GRAINS":546.45,"SOIR":10.0}},"lancements":[["FORMULE SALE","Formule",0,1055,1691,8.74],["PINK LATTE","Autres boissons",0,0,274,1.42],["SALMON TOASTS","Sale",0,0,199,1.03],["SIMETI (grains)","Grains",0,15,178,0.92],["KOMBUCHA","Autres boissons",0,127,112,0.58],["OEUF A LA COQUE","Sale",0,0,110,0.57],["CARNAVAL (grains)","Grains",0,0,108,0.56]],"declins":[["FORMULE TOAST","Formule",2289,1188,0,-100],["ESP MAR","Autres boissons",1410,0,0,-100],["BIERE 33CL","Autres boissons",445,10,10,-98],["FILTRE / BATCH BREW","Cafe",410,176,172,-58],["ICED TEA","Autres boissons",972,748,532,-45]],"objectifs":{"b2b_recurrent_mensuel":32000,"b2b_vente_annuel":80000,"oberkampf_mensuel":30000},"poisso":[{"chantier":"Recrutement staff","statut":"en cours"},{"chantier":"Finalisation des recettes, test en conditions reelles","statut":"en cours"},{"chantier":"Mobilier & petit materiel (TPE, vaisselle, consommables)","statut":"en cours"},{"chantier":"Communication & lancement (planning + liste invites, avec Orianna)","statut":"en cours"},{"chantier":"Avenant au bail au nom de Terrah Poissonniere","statut":"en cours"},{"chantier":"Depot de capital / domiciliation","statut":"fait"}],"shopifyPart":0.6732,"pipeline":{"prospects":387,"pipeline":7,"relance":13,"mort":2,"cafeOffert":106,"cafeAOffrir":17}};</script>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const EPOCH = Date.UTC(2025, 0, 1);
+const DAY = 86400000;
+const NB = " ";
+const MOISFR = ["jan","fév","mars","avr","mai","juin","juil","août","sept","oct","nov","déc"];
+
+let AX = DATA.ax.slice();
+let CLIENTS = DATA.clients.slice();
+let FACTURES = DATA.factures.slice();
+let SQ = DATA.sq;
+let GRAN = "M";
+let PKEY = null;
+let CACHE = {};
+let AXO_LABEL = "livré avec la page";
+
+/* ------------------------------------------------------------------ dates */
+const dayToDate = (n) => new Date(EPOCH + n * DAY);
+function dateToDay(d) {
+  return Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - EPOCH) / DAY);
+}
+function isoWeek(d) {
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  t.setUTCDate(t.getUTCDate() - ((t.getUTCDay() + 6) % 7) + 3);
+  const f = new Date(Date.UTC(t.getUTCFullYear(), 0, 4));
+  f.setUTCDate(f.getUTCDate() - ((f.getUTCDay() + 6) % 7) + 3);
+  return [t.getUTCFullYear(), 1 + Math.round((t - f) / (7 * DAY))];
+}
+function pkeyOf(dayN, gran) {
+  const d = dayToDate(dayN);
+  if (gran === "M") return "M" + d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0");
+  if (gran === "Q") return "Q" + d.getUTCFullYear() + "-" + (Math.floor(d.getUTCMonth() / 3) + 1);
+  const w = isoWeek(d);
+  return "W" + w[0] + "-" + String(w[1]).padStart(2, "0");
+}
+function pLabel(k) {
+  const [g, rest] = [k[0], k.slice(1)];
+  const [y, n] = rest.split("-");
+  if (g === "M") return MOISFR[+n - 1] + " " + y;
+  if (g === "Q") return "T" + n + " " + y;
+  return "sem. " + (+n) + " · " + y;
+}
+function pShort(k) {
+  const [g, rest] = [k[0], k.slice(1)];
+  const [y, n] = rest.split("-");
+  if (g === "M") return MOISFR[+n - 1] + NB + y.slice(2);
+  if (g === "Q") return "T" + n + NB + y.slice(2);
+  return "S" + (+n);
+}
+function yearAgo(k) {
+  const [g, rest] = [k[0], k.slice(1)];
+  const [y, n] = rest.split("-");
+  return g + (+y - 1) + "-" + n;
+}
+function pRange(k) {
+  const g = k[0], [y, n] = k.slice(1).split("-");
+  if (g === "M") return [Date.UTC(+y, +n - 1, 1), Date.UTC(+y, +n, 1)];
+  if (g === "Q") return [Date.UTC(+y, (+n - 1) * 3, 1), Date.UTC(+y, +n * 3, 1)];
+  const f = new Date(Date.UTC(+y, 0, 4));
+  f.setUTCDate(f.getUTCDate() - ((f.getUTCDay() + 6) % 7));
+  const s = f.getTime() + (+n - 1) * 7 * DAY;
+  return [s, s + 7 * DAY];
+}
+
+/* ------------------------------------------------------------- formatage */
+function eur(v, dec) {
+  dec = dec || 0;
+  const s = Math.abs(v).toFixed(dec).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, NB);
+  return (v < 0 ? "−" : "") + s + NB + "€";
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function pctTxt(v) { return (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(0) + NB + "%"; }
+function evCls(v) { return v > 0.5 ? "up" : v < -0.5 ? "down" : "flat"; }
+
+/* ------------------------------------------------- classification (JS = PY) */
+function norm(s) {
+  return (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+function classify(cat, prod, titre) {
+  const c = norm(cat), p = norm(prod), blob = p + " " + norm(titre);
+  const has = (...k) => k.some((x) => blob.indexOf(x) >= 0);
+  if (has("solde", "reequilibrage", "avoir", "trop paye")) return 3;
+  if (c.indexOf("evenement") === 0) return 2;
+  if (p.indexOf("location") === 0) return 0;
+  if (has("projet maurice sfez")) return 1;
+  if (has("apport d'affaire", "apport d affaire")) return 1;
+  if (has("forfait entretien")) return 0;
+  if (has("maintenance", "serenite")) return 0;
+  if (has("installation", "reglage")) return 1;
+  if (has("livraison", "envoi a domicile", "deplacement")) return 1;
+  if (has("sachet", "etiquette")) return 0;
+  if (has("cartouche", "filtration", "pastille", "detartrant", "pully", "nettoyage") || c === "entretien") return 0;
+  if (c === "ateliers" || c === "formations" || has("formation", "atelier")) return 1;
+  if (c === "cafe vert" || has("cafe vert")) return 1;
+  if (has("cafe moulu", "option - cafe")) return 0;
+  if (["cafe", "the / infusion", "food", "capsules"].indexOf(c) >= 0) return 0;
+  if (c.indexOf("materiel") >= 0 || c.indexOf("machine") >= 0) return 1;
+  return 1;
+}
+
+/* ------------------------------------------------------------- parsing CSV */
+function parseCSV(text) {
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+  const rows = [];
+  let row = [], cur = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) {
+      if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; }
+      else cur += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === ";") { row.push(cur); cur = ""; }
+    else if (ch === "\n") { row.push(cur); rows.push(row); row = []; cur = ""; }
+    else if (ch !== "\r") cur += ch;
+  }
+  if (cur !== "" || row.length) { row.push(cur); rows.push(row); }
+  return rows;
+}
+function frDate(s) {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec((s || "").trim());
+  if (!m) return null;
+  return Math.round((Date.UTC(+m[3], +m[2] - 1, +m[1]) - EPOCH) / DAY);
+}
+function frNum(s) { return parseFloat((s || "0").replace(/\s/g, "").replace(",", ".")) || 0; }
+
+function ingest(text) {
+  const rows = parseCSV(text);
+  if (rows.length < 2) throw new Error("fichier vide ou illisible");
+  const hdr = rows[0].map(norm);
+  const col = (name) => {
+    const i = hdr.indexOf(norm(name));
+    if (i < 0) throw new Error("colonne « " + name + " » absente du fichier");
+    return i;
+  };
+  const cF = col("ID Facture"), cD = col("Date de la facture"), cC = col("Catégorie du produit"),
+    cP = col("Date de paiement de la facture"), cH = col("Montant total HT"),
+    cN = col("nom du client"), cPr = col("Nom du produit"), cT = col("Titre de la ligne de facture");
+  const clients = [], cmap = new Map(), factures = [], fmap = new Map(), ax = [];
+  let skipped = 0;
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (r.length < hdr.length || !r[cD]) { skipped++; continue; }
+    const d = frDate(r[cD]);
+    if (d === null) { skipped++; continue; }
+    const cl = (r[cN] || "").trim();
+    if (!cmap.has(cl)) { cmap.set(cl, clients.length); clients.push(cl); }
+    const fa = r[cF];
+    if (!fmap.has(fa)) { fmap.set(fa, factures.length); factures.push(fa); }
+    const pd = frDate(r[cP]);
+    ax.push([d, cmap.get(cl), Math.round(frNum(r[cH]) * 100),
+      classify(r[cC], r[cPr], r[cT]), pd === null ? -1 : pd, fmap.get(fa)]);
+  }
+  if (!ax.length) throw new Error("aucune ligne de facture exploitable");
+  return { ax, clients, factures, skipped, total: ax.reduce((s, a) => s + a[2], 0) / 100 };
+}
+
+/* ------------------------------------------------------------- agrégation */
+function build() {
+  CACHE = {};
+  for (const g of ["W", "M", "Q"]) {
+    const m = new Map();
+    const get = (k) => {
+      if (!m.has(k)) m.set(k, { rec: 0, ven: 0, evt: 0, aju: 0, sqCa: 0, sqTk: 0, lines: [] });
+      return m.get(k);
+    };
+    for (const a of AX) {
+      const b = get(pkeyOf(a[0], g));
+      const v = a[2] / 100;
+      if (a[3] === 0) b.rec += v; else if (a[3] === 1) b.ven += v;
+      else if (a[3] === 2) b.evt += v; else b.aju += v;
+      b.lines.push(a);
+    }
+    for (const s of SQ) { const b = get(pkeyOf(s[0], g)); b.sqCa += s[1] / 100; b.sqTk += s[2]; }
+    CACHE[g] = { map: m, keys: [...m.keys()].sort() };
+  }
+  const maxDay = AX.reduce((x, a) => Math.max(x, a[0]), 0);
+  CACHE.asOf = maxDay;
+  CACHE.asOfDate = dayToDate(maxDay);
+}
+const P = (k) => CACHE[GRAN].map.get(k) || { rec: 0, ven: 0, evt: 0, aju: 0, sqCa: 0, sqTk: 0, lines: [] };
+
+function atlFor(k) {
+  const g = k[0], months = [];
+  if (g === "M") months.push(k.slice(1));
+  else if (g === "Q") {
+    const [y, n] = k.slice(1).split("-");
+    for (let i = 0; i < 3; i++) months.push(y + "-" + String((+n - 1) * 3 + i + 1).padStart(2, "0"));
+  } else return null;
+  let w = 0, f = 0, s = 0, gap = false, any = false;
+  for (const m of months) {
+    const a = DATA.atl[m];
+    if (!a) continue;
+    any = true; w += a[0]; f += a[1]; s += a[2]; gap = gap || a[3];
+  }
+  return any ? { w, f, s, total: w + f + s, gap } : null;
+}
+
+/* ------------------------------------------------------- clients & impayés */
+function clientStats() {
+  const last = new Map(), first = new Map(), dates = new Map(), inv = new Map();
+  for (const a of AX) {
+    const c = a[1];
+    if (!last.has(c) || a[0] > last.get(c)) last.set(c, a[0]);
+    if (!first.has(c) || a[0] < first.get(c)) first.set(c, a[0]);
+    if (!dates.has(c)) dates.set(c, new Set());
+    dates.get(c).add(a[0]);
+    const f = a[5];
+    if (!inv.has(f)) inv.set(f, { ht: 0, d: a[0], c: c, paid: a[4] });
+    const o = inv.get(f);
+    o.ht += a[2] / 100;
+    if (a[4] >= 0) o.paid = a[4];
+  }
+  return { last, first, dates, inv };
+}
+function median(arr) {
+  const s = arr.slice().sort((a, b) => a - b);
+  const n = s.length;
+  return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2;
+}
+
+/* ------------------------------------------------------------------ svg */
+function svgBars(items, opts) {
+  const W = 980, H = opts.h || 250, PL = 62, PR = opts.pr || 24, PT = 22, PB = 44;
+  const iw = W - PL - PR, ih = H - PT - PB;
+  const vmax = opts.vmax || Math.max(1, ...items.map((i) => Math.max(0, i.v))) * 1.15;
+  const step = iw / Math.max(items.length, 1), bw = step * 0.6;
+  let o = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + esc(opts.alt || "") + '">';
+  const ticks = 4;
+  for (let t = 0; t <= ticks; t++) {
+    const gv = vmax * t / ticks, y = PT + ih - gv / vmax * ih;
+    o += '<line x1="' + PL + '" y1="' + y.toFixed(1) + '" x2="' + (PL + iw) + '" y2="' + y.toFixed(1) + '" class="grid"/>';
+    o += '<text x="' + (PL - 10) + '" y="' + (y + 4).toFixed(1) + '" class="ax ar">' +
+      (gv >= 1000 ? (gv / 1000).toFixed(gv < 10000 ? 1 : 0).replace(".", ",") + "k" : gv.toFixed(0)) + "</text>";
+  }
+  if (opts.obj && opts.obj < vmax) {
+    const y = PT + ih - opts.obj / vmax * ih;
+    o += '<line x1="' + PL + '" y1="' + y.toFixed(1) + '" x2="' + (PL + iw) + '" y2="' + y.toFixed(1) + '" class="objline"/>';
+    o += '<text x="' + (PL + iw - 4) + '" y="' + (y - 7).toFixed(1) + '" class="ax ar objtxt">' + esc(opts.objLabel || "") + "</text>";
+  }
+  items.forEach((it, i) => {
+    const h = Math.max(0, it.v) / vmax * ih, x = PL + i * step + (step - bw) / 2;
+    o += '<rect x="' + x.toFixed(1) + '" y="' + (PT + ih - h).toFixed(1) + '" width="' + bw.toFixed(1) +
+      '" height="' + h.toFixed(1) + '" rx="2" class="' + (opts.cls || "bar") + (it.cur ? " cur" : "") + '"><title>' +
+      esc(it.label + " : " + eur(it.v)) + "</title></rect>";
+    if (items.length <= 16 || i % 2 === 0)
+      o += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - PB + 17) + '" class="ax am">' + esc(it.short) + "</text>";
+  });
+  if (opts.line) {
+    const lmin = opts.lmin, lmax = opts.lmax;
+    const pts = items.map((it, i) => [PL + i * step + step / 2, PT + ih - (it.l - lmin) / (lmax - lmin) * ih]);
+    o += '<polyline points="' + pts.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ") + '" class="line"/>';
+    pts.forEach((p, i) => {
+      o += '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="3" class="dot"><title>' +
+        esc(items[i].label + " : " + eur(items[i].l, 2)) + "</title></circle>";
+    });
+    for (const lv of [lmin, (lmin + lmax) / 2, lmax]) {
+      const y = PT + ih - (lv - lmin) / (lmax - lmin) * ih;
+      o += '<text x="' + (PL + iw + 8) + '" y="' + (y + 4).toFixed(1) + '" class="ax">' + lv.toFixed(1).replace(".", ",") + "</text>";
+    }
+  }
+  return o + "</svg>";
+}
+
+/* --------------------------------------------------------------- rendu */
+function tile(name, val, prev, n1, obj, note) {
+  let ev = "";
+  if (prev !== null && prev !== 0) {
+    const d = (val / prev - 1) * 100;
+    ev += '<span class="ev ' + evCls(d) + '">' + pctTxt(d) + " <em>vs préc.</em></span>";
+  }
+  if (n1 !== null && n1 !== 0) {
+    const d = (val / n1 - 1) * 100;
+    ev += '<span class="ev ' + evCls(d) + '">' + pctTxt(d) + " <em>vs N-1</em></span>";
+  }
+  let g = "";
+  if (obj) {
+    const p = Math.max(0, Math.min(val / obj * 100, 100));
+    g = '<div class="gauge"><div class="gfill" style="width:' + p.toFixed(0) + '%"></div></div>' +
+      '<div class="gtxt">' + (val / obj * 100).toFixed(0) + NB + "% de l'objectif " + eur(obj) + "</div>";
+  }
+  return '<article class="tile"><h3>' + esc(name) + '</h3><div class="big">' + eur(val) +
+    '</div><div class="evrow">' + ev + "</div>" + g + '<p class="note">' + esc(note) + "</p></article>";
+}
+
+function renderPeriodSelect() {
+  const keys = CACHE[GRAN].keys;
+  $("period").innerHTML = keys.map((k) => '<option value="' + k + '">' + esc(pLabel(k)) + "</option>").join("");
+  if (!keys.includes(PKEY)) PKEY = keys[Math.max(0, keys.length - 2)];
+  $("period").value = PKEY;
+  const i = keys.indexOf(PKEY);
+  $("prev").disabled = i <= 0;
+  $("next").disabled = i >= keys.length - 1;
+  const [a, b] = pRange(PKEY);
+  const f = (t) => new Date(t).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "UTC" });
+  $("pcur").textContent = f(a) + " → " + f(b - DAY);
+}
+
+function render() {
+  const keys = CACHE[GRAN].keys, i = keys.indexOf(PKEY);
+  const cur = P(PKEY), prev = i > 0 ? P(keys[i - 1]) : null, n1 = P(yearAgo(PKEY));
+  const O = DATA.objectifs;
+  const atl = atlFor(PKEY);
+  const totalPole = cur.rec + cur.ven + cur.evt + cur.aju + cur.sqCa + (atl ? atl.total : 0);
+
+  $("hperiod").textContent = pLabel(PKEY);
+  $("hmeta").innerHTML = "Axonaut : " + esc(AXO_LABEL) + "<br>Square, Shopify, plateformes : figés au " +
+    new Date(DATA.genere).toLocaleDateString("fr-FR");
+  $("ovsub").textContent = eur(totalPole) + " HT sur la période, tous pôles";
+
+  const mult = GRAN === "M" ? 1 : GRAN === "Q" ? 3 : 7 / 30.44;
+  $("tiles").innerHTML =
+    tile("B2B récurrent", cur.rec, prev ? prev.rec : null, n1.rec, O.b2b_recurrent_mensuel * mult,
+      "consommables + locations machines") +
+    tile("Coffeeshop Oberkampf", cur.sqCa, prev ? prev.sqCa : null, n1.sqCa, O.oberkampf_mensuel * mult,
+      "net de remises, hors taxes") +
+    tile("Ateliers", atl ? atl.total : 0, null, null, null,
+      atl ? "net de commissions — chantier en cours" : "non disponible à la semaine") +
+    tile("B2B vente", cur.ven, prev ? prev.ven : null, n1.ven, null,
+      "machines, installations, ponctuel") +
+    tile("Événements", cur.evt, prev ? prev.evt : null, n1.evt, null,
+      "prestations barista, coffee corners");
+  $("ovnote").innerHTML = "Les objectifs mensuels de septembre sont proratisés sur la granularité choisie. " +
+    (GRAN === "W" ? "Le pôle ateliers n'existe qu'au mois : les versements des plateformes sont mensuels. " : "") +
+    "Terrah Poissonnière n'a pas encore d'activité." +
+    (Math.abs(cur.aju) > 1 ? " Ajustements comptables sur la période : " + eur(cur.aju) + "." : "");
+
+  /* ---- B2B ---- */
+  const CS = clientStats();
+  const asOf = CACHE.asOf;
+  let actifs = 0;
+  CS.last.forEach((d) => { if (asOf - d <= 60) actifs++; });
+  const [pa, pb] = pRange(PKEY);
+  const d0 = Math.round((pa - EPOCH) / DAY), d1 = Math.round((pb - EPOCH) / DAY);
+  let nouveaux = 0;
+  CS.first.forEach((d) => { if (d >= d0 && d < d1) nouveaux++; });
+
+  const rec = [], churn = [];
+  CS.dates.forEach((set, c) => {
+    const ds = [...set].sort((a, b) => a - b);
+    if (ds.length < 3) return;
+    const gaps = [];
+    for (let k = 1; k < ds.length; k++) gaps.push(ds[k] - ds[k - 1]);
+    const med = median(gaps);
+    if (med <= 0) return;
+    const age = asOf - ds[ds.length - 1], r = age / med;
+    let ca12 = 0;
+    for (const a of AX) if (a[1] === c && a[0] > asOf - 365 && a[3] < 2) ca12 += a[2] / 100;
+    const o = { c, r, age, med, ca12 };
+    if (r >= 0.86 && r < 1) rec.push(o); else if (r >= 1 && r < 3) churn.push(o);
+  });
+  rec.sort((a, b) => b.r - a.r);
+  churn.sort((a, b) => b.ca12 - a.ca12);
+
+  $("b2bkpi").innerHTML =
+    '<div class="kpi"><div class="k">' + actifs + '</div><div class="l">clients actifs — facturés sous 60 jours</div></div>' +
+    '<div class="kpi"><div class="k">' + nouveaux + '</div><div class="l">nouveaux clients sur la période</div></div>' +
+    '<div class="kpi"><div class="k">' + rec.length + ' <span style="color:var(--mut)">/</span> ' + churn.length +
+    '</div><div class="l">à relancer / en risque de churn</div></div>' +
+    '<div class="kpi"><div class="k">' + DATA.pipeline.pipeline + '</div><div class="l">prospects en pipeline</div></div>';
+
+  const N = GRAN === "W" ? 16 : GRAN === "Q" ? 8 : 13;
+  const win = keys.slice(Math.max(0, i - N + 1), i + 1);
+  $("chrec").innerHTML = svgBars(
+    win.map((k) => ({ label: pLabel(k), short: pShort(k), v: P(k).rec, cur: k === PKEY })),
+    { obj: O.b2b_recurrent_mensuel * mult, objLabel: "objectif " + eur(O.b2b_recurrent_mensuel * mult),
+      alt: "CA B2B récurrent par période", cls: "bar" });
+  $("recnote").textContent = "CA récurrent sur les " + win.length + " dernières périodes. " +
+    "Août est structurellement bas : les clients sont très majoritairement des bureaux et des cafés parisiens.";
+
+  /* top 10 */
+  const byCli = new Map();
+  for (const a of cur.lines) {
+    if (a[3] > 1) continue;
+    const o = byCli.get(a[1]) || { ca: 0, rec: 0 };
+    o.ca += a[2] / 100;
+    if (a[3] === 0) o.rec += a[2] / 100;
+    byCli.set(a[1], o);
+  }
+  const n1Cli = new Map();
+  for (const a of P(yearAgo(PKEY)).lines) {
+    if (a[3] > 1) continue;
+    n1Cli.set(a[1], (n1Cli.get(a[1]) || 0) + a[2] / 100);
+  }
+  const totB2b = [...byCli.values()].reduce((s, o) => s + o.ca, 0);
+  const top = [...byCli.entries()].sort((a, b) => b[1].ca - a[1].ca).slice(0, 10);
+  $("toplbl").textContent = pLabel(PKEY);
+  $("top10").innerHTML = top.length ? top.map(([c, o]) => {
+    const old = n1Cli.get(c) || 0;
+    const ev = old ? '<span class="' + evCls((o.ca / old - 1) * 100) + '">' + pctTxt((o.ca / old - 1) * 100) + "</span>"
+      : "<em>nouveau</em>";
+    return "<tr><td class='cl'>" + esc(CLIENTS[c]) + "</td><td class='n'>" + eur(o.ca) +
+      "</td><td class='n'>" + eur(o.rec) + "</td><td class='n'>" + (old ? eur(old) : "—") +
+      "</td><td class='n'>" + ev + "</td><td class='n'>" +
+      (totB2b ? (o.ca / totB2b * 100).toFixed(1).replace(".", ",") + NB + "%" : "—") +
+      "</td><td class='n'>" + dayToDate(CS.last.get(c)).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", timeZone: "UTC" }) +
+      "</td></tr>";
+  }).join("") : "<tr><td colspan='7' class='empty'>Aucune facture B2B sur cette période.</td></tr>";
+  const share = top.reduce((s, t) => s + t[1].ca, 0);
+  $("topnote").textContent = totB2b
+    ? "Ces " + top.length + " clients pèsent " + (share / totB2b * 100).toFixed(0) + NB + "% du CA B2B de la période (" + eur(totB2b) + ")."
+    : "";
+
+  const relRow = (o, sev) => "<tr><td class='cl'>" + esc(CLIENTS[o.c]) + "</td><td class='n'><span class='pill " + sev +
+    "'>" + o.r.toFixed(2).replace(".", ",") + "×</span></td><td class='n'>" + o.age + NB + "j</td><td class='n'>" +
+    o.med.toFixed(0) + NB + "j</td><td class='n'>" + eur(o.ca12) + "</td></tr>";
+  $("rel").innerHTML = rec.length ? rec.map((o) => relRow(o, "warn")).join("")
+    : "<tr><td colspan='5' class='empty'>Personne dans cette bande.</td></tr>";
+  $("churn").innerHTML = churn.length ? churn.slice(0, 12).map((o) => relRow(o, "crit")).join("")
+    : "<tr><td colspan='5' class='empty'>Personne dans cette bande.</td></tr>";
+  $("relnote").innerHTML = "Calculé à la date de la dernière facture de l'export (" +
+    CACHE.asOfDate.toLocaleDateString("fr-FR", { timeZone: "UTC" }) + "), pas à la date du jour, et indépendant de la période choisie. " +
+    "Seuils repris de la page farming ; les clients au-delà de 3× leur rythme sont considérés comme perdus et sortis de la liste.";
+
+  /* nouveaux clients par période */
+  const nk = keys.slice(Math.max(0, i - 5), i + 1);
+  $("nouv").innerHTML = nk.map((k) => {
+    const [a, b] = pRange(k);
+    const x0 = Math.round((a - EPOCH) / DAY), x1 = Math.round((b - EPOCH) / DAY);
+    let n = 0;
+    CS.first.forEach((d) => { if (d >= x0 && d < x1) n++; });
+    return "<tr><td>" + esc(pLabel(k)) + "</td><td class='n'>" + n + "</td></tr>";
+  }).join("");
+  $("nouvnote").textContent = "Un « nouveau » est un client dont la toute première facture de l'export tombe dans la période.";
+  $("pipetxt").innerHTML = "Le pipeline vit sur la <a href='https://allterrahpro-collab.github.io/pipelineterrah/'>page pipeline</a> : " +
+    DATA.pipeline.prospects + " prospects actifs, " + DATA.pipeline.pipeline + " en pipeline, " +
+    DATA.pipeline.relance + " à relancer. " + DATA.pipeline.cafeOffert + "&nbsp;kg de café déjà offerts, " +
+    DATA.pipeline.cafeAOffrir + "&nbsp;kg à déposer. Le suivi client détaillé reste sur la " +
+    "<a href='https://allterrahpro-collab.github.io/farmingterrah/'>page farming</a>.";
+
+  /* ---- impayés ---- */
+  const buck = [["0-30j", 0, 0], ["31-60j", 0, 0], ["61-90j", 0, 0], ["91-180j", 0, 0], [">180j", 0, 0]];
+  const unpaid = [];
+  CS.inv.forEach((o) => {
+    if (o.paid >= 0 || o.ht <= 0) return;
+    const age = asOf - o.d;
+    const b = age <= 30 ? 0 : age <= 60 ? 1 : age <= 90 ? 2 : age <= 180 ? 3 : 4;
+    buck[b][1]++; buck[b][2] += o.ht;
+    if (age > 30) unpaid.push({ c: o.c, ht: o.ht, age, d: o.d });
+  });
+  const s30 = buck.slice(1).reduce((s, b) => s + b[2], 0), n30 = buck.slice(1).reduce((s, b) => s + b[1], 0);
+  const delays = [];
+  CS.inv.forEach((o) => { if (o.paid >= 0) delays.push(o.paid - o.d); });
+  $("imp30").textContent = eur(s30);
+  $("imp30n").textContent = n30 + " factures au-delà de 30 jours";
+  $("imptxt").innerHTML = "Le délai de paiement médian réel est de <b>" + (delays.length ? median(delays).toFixed(0) : "—") +
+    " jours</b> : les clients paient vite. La traîne n'est donc pas un problème de délai mais un stock jamais relancé — " +
+    buck[4][1] + " factures dépassent 180 jours, dont une partie est probablement du lettrage à corriger plutôt que du dû réel.";
+  $("impbuck").innerHTML = buck.map((b) => "<tr><td>" + b[0] + "</td><td class='n'>" + b[1] +
+    "</td><td class='n'>" + eur(b[2]) + "</td></tr>").join("") +
+    "<tr><td><b>Total</b></td><td class='n'><b>" + buck.reduce((s, b) => s + b[1], 0) +
+    "</b></td><td class='n'><b>" + eur(buck.reduce((s, b) => s + b[2], 0)) + "</b></td></tr>";
+  unpaid.sort((a, b) => b.ht - a.ht);
+  $("imptop").innerHTML = unpaid.slice(0, 12).map((o) => "<tr><td class='cl'>" + esc(CLIENTS[o.c]) +
+    "</td><td class='n'>" + eur(o.ht) + "</td><td class='n'><span class='pill " + (o.age > 180 ? "crit" : "warn") +
+    "'>" + o.age + NB + "j</span></td><td class='n'>" +
+    dayToDate(o.d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "UTC" }) +
+    "</td></tr>").join("") || "<tr><td colspan='4' class='empty'>Aucun impayé de plus de 30 jours.</td></tr>";
+
+  /* ---- coffeeshop ---- */
+  const panier = cur.sqTk ? cur.sqCa / cur.sqTk : 0;
+  const pPrev = prev && prev.sqTk ? prev.sqCa / prev.sqTk : null;
+  const pN1 = n1.sqTk ? n1.sqCa / n1.sqTk : null;
+  $("shopsub").textContent = cur.sqTk.toLocaleString("fr-FR") + " passages · panier moyen " + eur(panier, 2);
+  $("shoptiles").innerHTML =
+    tile("Passages", cur.sqTk, prev ? prev.sqTk : null, n1.sqTk || null, null, "un ticket = un passage")
+      .replace(eur(cur.sqTk), cur.sqTk.toLocaleString("fr-FR")) +
+    tile("Panier moyen", panier, pPrev, pN1, null, "CA net ÷ nombre de tickets")
+      .replace(eur(panier), eur(panier, 2));
+  const shopWin = win.map((k) => {
+    const b = P(k);
+    return { label: pLabel(k), short: pShort(k), v: b.sqCa, l: b.sqTk ? b.sqCa / b.sqTk : 0, cur: k === PKEY };
+  }).filter((x) => x.v > 0);
+  const ls = shopWin.map((x) => x.l);
+  $("chshop").innerHTML = shopWin.length ? svgBars(shopWin, {
+    cls: "bar2", pr: 46, alt: "CA et panier moyen du coffeeshop par période",
+    line: true, lmin: Math.floor(Math.min(...ls) * 10) / 10 - 0.2, lmax: Math.ceil(Math.max(...ls) * 10) / 10 + 0.2,
+    obj: O.oberkampf_mensuel * mult, objLabel: "objectif " + eur(O.oberkampf_mensuel * mult),
+  }) : '<p class="empty">Pas de données Square sur cette fenêtre.</p>';
+  $("shopnote").innerHTML = "<b>Le panier monte, le flux baisse.</b> Sur l'année écoulée le panier moyen a gagné " +
+    "près de 7 %, mais les passages ont reculé de près de 40 % depuis le pic d'octobre. " +
+    "La hausse du panier masque la perte de fréquentation : c'est le flux qu'il faut regarder, pas le CA seul.";
+
+  const mix8 = DATA.sqcat["2026-08"], mix7 = DATA.sqcat["2026-07"];
+  const t8 = Object.values(mix8).reduce((s, v) => s + v, 0);
+  $("mix").innerHTML = Object.entries(mix8).sort((a, b) => b[1] - a[1]).map(([k, v]) => {
+    const o = mix7[k] || 0, d = o ? (v / o - 1) * 100 : null;
+    return "<tr><td class='cl'>" + esc(k) + "</td><td class='n'>" + eur(v) + "</td><td class='n'>" +
+      (v / t8 * 100).toFixed(1).replace(".", ",") + NB + "%</td><td class='n " + (d === null ? "" : evCls(d)) + "'>" +
+      (d === null ? "—" : pctTxt(d)) + "</td></tr>";
+  }).join("");
+  $("lanc").innerHTML = DATA.lancements.map((L) => {
+    const [nom, cat, j6, j7, j8, pm] = L;
+    const v = pm >= 3 ? ["good", "on garde"] : pm >= 1 ? (j8 >= j7 ? ["warn", "on attend"] : ["crit", "à trancher"]) : ["crit", "on kill"];
+    return "<tr><td class='cl'>" + esc(nom) + "</td><td class='n'>" + eur(j6) + "</td><td class='n'>" + eur(j7) +
+      "</td><td class='n'>" + eur(j8) + "</td><td class='n'>" + String(pm).replace(".", ",") + NB +
+      "%</td><td><span class='pill " + v[0] + "'>" + v[1] + "</span></td></tr>";
+  }).join("");
+  $("dec").innerHTML = DATA.declins.map((L) => {
+    const [nom, cat, j6, j7, j8, ev] = L;
+    return "<tr><td class='cl'>" + esc(nom) + "</td><td class='n'>" + eur(j6) + "</td><td class='n'>" + eur(j7) +
+      "</td><td class='n'>" + eur(j8) + "</td><td class='n down'>" + pctTxt(ev) + "</td></tr>";
+  }).join("");
+
+  /* ---- ateliers (WIP) ---- */
+  const am = Object.keys(DATA.atl).sort().filter((m) => m >= "2025-09");
+  $("chatl").innerHTML = (() => {
+    const W = 980, H = 220, PL = 62, PR = 24, PT = 22, PB = 50;
+    const iw = W - PL - PR, ih = H - PT - PB, vmax = 7000;
+    const step = iw / am.length, bw = step * 0.56;
+    let o = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="CA ateliers net par canal">';
+    for (let t = 0; t <= 2; t++) {
+      const gv = vmax * t / 2, y = PT + ih - gv / vmax * ih;
+      o += '<line x1="' + PL + '" y1="' + y.toFixed(1) + '" x2="' + (PL + iw) + '" y2="' + y.toFixed(1) + '" class="grid"/>';
+      o += '<text x="' + (PL - 10) + '" y="' + (y + 4).toFixed(1) + '" class="ax ar">' + (gv / 1000).toFixed(1).replace(".", ",") + "k</text>";
+    }
+    am.forEach((m, i) => {
+      const a = DATA.atl[m], x = PL + i * step + (step - bw) / 2;
+      let y = PT + ih;
+      [[a[0], "st1"], [a[1], "st2"], [a[2], "st3"]].forEach(([v, cls]) => {
+        const h = v / vmax * ih;
+        if (h > 0.4) { y -= h; o += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '" class="' + cls + '"/>'; }
+      });
+      const d = new Date(m + "-01T00:00:00Z");
+      o += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - PB + 17) + '" class="ax am">' +
+        MOISFR[d.getUTCMonth()] + NB + m.slice(2, 4) + "</text>";
+      if (a[3]) o += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - PB + 32) + '" class="ax am" fill="var(--crit)" font-weight="700">!</text>';
+    });
+    return o + "</svg>";
+  })();
+  $("atl").innerHTML = am.map((m) => {
+    const a = DATA.atl[m], t = a[0] + a[1] + a[2];
+    const d = new Date(m + "-01T00:00:00Z");
+    return "<tr><td class='cl'>" + MOISFR[d.getUTCMonth()] + " " + m.slice(0, 4) + "</td><td class='n'>" + eur(a[0]) +
+      "</td><td class='n'>" + eur(a[1]) + "</td><td class='n'>" + eur(a[2]) + "</td><td class='n'>" + eur(t) +
+      "</td><td class='n'>" + (t ? (a[2] / t * 100).toFixed(0) + NB + "%" : "—") + "</td><td>" +
+      (a[3] ? "<span class='pill crit'>versement manquant</span>" : "") + "</td></tr>";
+  }).join("");
+
+  $("poisso").innerHTML = DATA.poisso.map((p) =>
+    "<tr><td class='cl'>" + esc(p.chantier) + "</td><td><span class='pill " +
+    (p.statut === "fait" ? "good" : "warn") + "'>" + esc(p.statut) + "</span></td></tr>").join("");
+}
+
+/* ---------------------------------------------------------------- sources */
+function renderSources() {
+  const d = CACHE.asOfDate;
+  $("s-axo").textContent = AXO_LABEL + " · " + AX.length.toLocaleString("fr-FR") + " lignes · dernière facture le " +
+    d.toLocaleDateString("fr-FR", { timeZone: "UTC" });
+  const g = new Date(DATA.genere).toLocaleDateString("fr-FR");
+  $("s-sq").textContent = "figé au " + g + " · " + SQ.length + " jours";
+  $("s-shop").textContent = "figé au " + g;
+  $("s-atl").textContent = "figé au " + g + " · 3 mois incomplets";
+}
+
+function showMsg(txt, cls) {
+  const m = $("msg");
+  m.textContent = txt;
+  m.className = cls;
+}
+
+function loadFile(f) {
+  if (!f) return;
+  if (!/\.csv$/i.test(f.name)) { showMsg("Ce n'est pas un fichier .csv — attendu : l'export de factures Axonaut.", "err"); return; }
+  const r = new FileReader();
+  r.onerror = () => showMsg("Le fichier n'a pas pu être lu.", "err");
+  r.onload = () => {
+    try {
+      const res = ingest(String(r.result));
+      AX = res.ax; CLIENTS = res.clients; FACTURES = res.factures;
+      AXO_LABEL = "importé (" + f.name + ")";
+      build();
+      renderPeriodSelect();
+      render();
+      renderSources();
+      showMsg("Import réussi : " + res.ax.length.toLocaleString("fr-FR") + " lignes, " +
+        res.clients.length + " clients, total " + eur(res.total) + " HT" +
+        (res.skipped ? " — " + res.skipped + " ligne(s) ignorée(s), sans date exploitable." : ".") +
+        " Square, Shopify et les plateformes restent figés.", "ok");
+    } catch (err) {
+      showMsg("Import impossible : " + err.message, "err");
+    }
+  };
+  r.readAsText(f, "utf-8");
+}
+
+/* --------------------------------------------------------------- écouteurs */
+$("pick").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", (e) => loadFile(e.target.files[0]));
+const drop = $("drop");
+["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => {
+  e.preventDefault(); drop.classList.add("over");
+}));
+["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => {
+  e.preventDefault(); drop.classList.remove("over");
+}));
+drop.addEventListener("drop", (e) => loadFile(e.dataTransfer.files[0]));
+document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll(".seg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  const old = PKEY ? pRange(PKEY)[0] : null;
+  GRAN = b.dataset.g;
+  if (old !== null) {
+    const k = pkeyOf(Math.round((old - EPOCH) / DAY), GRAN);
+    PKEY = CACHE[GRAN].keys.includes(k) ? k : null;
+  }
+  renderPeriodSelect(); render();
+}));
+$("period").addEventListener("change", (e) => { PKEY = e.target.value; renderPeriodSelect(); render(); });
+$("prev").addEventListener("click", () => {
+  const k = CACHE[GRAN].keys, i = k.indexOf(PKEY);
+  if (i > 0) { PKEY = k[i - 1]; renderPeriodSelect(); render(); }
+});
+$("next").addEventListener("click", () => {
+  const k = CACHE[GRAN].keys, i = k.indexOf(PKEY);
+  if (i < k.length - 1) { PKEY = k[i + 1]; renderPeriodSelect(); render(); }
+});
+
+build();
+renderPeriodSelect();
+render();
+renderSources();
+</script>
+
+</body>
+</html>
