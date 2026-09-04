@@ -128,6 +128,8 @@ select{font-family:"IBM Plex Mono",monospace; font-size:13px; padding:6px 10px;
 .bar.cur{opacity:1}
 .bar2{fill:var(--roast); opacity:.8}
 .bar2.cur{opacity:1}
+.bar.partial,.bar2.partial{opacity:.32; stroke:currentColor; stroke-dasharray:3 3; stroke-width:1}
+.partialtxt{fill:var(--mut); font-style:italic}
 .objline{stroke:var(--crit); stroke-width:1.2; stroke-dasharray:5 4}
 .objtxt{fill:var(--crit)}
 .line{fill:none; stroke:var(--ink); stroke-width:1.6; stroke-linejoin:round}
@@ -610,8 +612,37 @@ function build() {
   const maxDay = AX.reduce((x, a) => Math.max(x, a[0]), 0);
   CACHE.asOf = maxDay;
   CACHE.asOfDate = dayToDate(maxDay);
+  /* dernier jour couvert par le figé Square : sert à prévenir quand l'export
+     Axonaut est plus récent que lui, plutôt que d'afficher un CA tronqué */
+  CACHE.sqMax = SQ.reduce((x, a) => Math.max(x, a[0]), 0);
 }
 const P = (k) => CACHE[GRAN].map.get(k) || { rec: 0, ven: 0, evt: 0, aju: 0, sqCa: 0, sqTk: 0, lines: [] };
+
+/* Bornes d'une période, en décalage de jours depuis l'epoch : [début, fin[ */
+function pBounds(k) {
+  const [a, b] = pRange(k);
+  return [Math.round((a - EPOCH) / DAY), Math.round((b - EPOCH) / DAY)];
+}
+/* Agrégation sur une fenêtre de jours quelconque : c'est ce qui permet la
+   comparaison « à date » (les n premiers jours du mois vs les n premiers du
+   mois précédent) plutôt que période entière contre période entière. */
+function sliceAgg(d0, d1) {
+  const o = { rec: 0, ven: 0, evt: 0, aju: 0, sqCa: 0, sqTk: 0, lines: [] };
+  for (const a of AX) {
+    if (a[0] < d0 || a[0] >= d1) continue;
+    const v = a[2] / 100;
+    if (a[3] === 0) o.rec += v; else if (a[3] === 1) o.ven += v;
+    else if (a[3] === 2) o.evt += v; else o.aju += v;
+    o.lines.push(a);
+  }
+  for (const s of SQ) {
+    if (s[0] < d0 || s[0] >= d1) continue;
+    o.sqCa += s[1] / 100; o.sqTk += s[2];
+  }
+  return o;
+}
+const fmtD = (n) => dayToDate(n).toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "UTC" });
+const fmtDY = (n) => dayToDate(n).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "2-digit", timeZone: "UTC" });
 
 function atlFor(k) {
   const g = k[0], months = [];
@@ -674,8 +705,11 @@ function svgBars(items, opts) {
   items.forEach((it, i) => {
     const h = Math.max(0, it.v) / vmax * ih, x = PL + i * step + (step - bw) / 2;
     o += '<rect x="' + x.toFixed(1) + '" y="' + (PT + ih - h).toFixed(1) + '" width="' + bw.toFixed(1) +
-      '" height="' + h.toFixed(1) + '" rx="2" class="' + (opts.cls || "bar") + (it.cur ? " cur" : "") + '"><title>' +
-      esc(it.label + " : " + eur(it.v)) + "</title></rect>";
+      '" height="' + h.toFixed(1) + '" rx="2" class="' + (opts.cls || "bar") + (it.cur ? " cur" : "") +
+      (it.partial ? " partial" : "") + '"><title>' +
+      esc(it.label + " : " + eur(it.v) + (it.partial ? " (période en cours)" : "")) + "</title></rect>";
+    if (it.partial) o += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (PT + ih - h - 6).toFixed(1) +
+      '" class="ax am partialtxt">en cours</text>';
     if (items.length <= 16 || i % 2 === 0)
       o += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - PB + 17) + '" class="ax am">' + esc(it.short) + "</text>";
   });
@@ -696,16 +730,32 @@ function svgBars(items, opts) {
 }
 
 /* --------------------------------------------------------------- rendu */
-function tile(name, val, prev, n1, obj, note) {
+let CMP = { partial: false, elapsed: 0, span: 0, curLbl: "", prevLbl: "", n1Lbl: "" };
+
+/* Un pourcentage n'a de sens que si la base de comparaison est positive et
+   pas dérisoire. Sur une fenêtre de quelques jours la base peut être nulle ou
+   négative (des avoirs sans facture en face) : on affiche alors l'écart en
+   euros, qui reste lisible, plutôt qu'un « −3 000 % » qui n'apprend rien. */
+function cmpChip(val, base, lbl, tip, isEur) {
+  if (base === null || (base === 0 && val === 0)) return "";
+  const fmt = isEur === false ? (v) => Math.round(v).toLocaleString("fr-FR") : (v) => eur(v);
+  if (base > 0) {
+    const d = (val / base - 1) * 100;
+    if (Math.abs(d) <= 999)
+      return '<span class="ev ' + evCls(d) + '" title="' + esc(tip) + '">' + pctTxt(d) +
+        " <em>" + lbl + "</em></span>";
+  }
+  const dd = val - base;
+  return '<span class="ev ' + evCls(dd) + '" title="' + esc(tip + " — base " + fmt(base) +
+    ", pourcentage non significatif") + '">' + (dd >= 0 ? "+" : "−") + fmt(Math.abs(dd)) +
+    " <em>" + lbl + "</em></span>";
+}
+
+function tile(name, val, prev, n1, obj, note, isEur) {
+  const sfx = CMP.partial ? " à date" : "";
   let ev = "";
-  if (prev !== null && prev !== 0) {
-    const d = (val / prev - 1) * 100;
-    ev += '<span class="ev ' + evCls(d) + '">' + pctTxt(d) + " <em>vs préc.</em></span>";
-  }
-  if (n1 !== null && n1 !== 0) {
-    const d = (val / n1 - 1) * 100;
-    ev += '<span class="ev ' + evCls(d) + '">' + pctTxt(d) + " <em>vs N-1</em></span>";
-  }
+  ev += cmpChip(val, prev, "vs préc." + sfx, CMP.curLbl + " vs " + CMP.prevLbl, isEur);
+  ev += cmpChip(val, n1, "vs N-1" + sfx, CMP.curLbl + " vs " + CMP.n1Lbl, isEur);
   let g = "";
   if (obj) {
     const p = Math.max(0, Math.min(val / obj * 100, 100));
@@ -731,32 +781,73 @@ function renderPeriodSelect() {
 
 function render() {
   const keys = CACHE[GRAN].keys, i = keys.indexOf(PKEY);
-  const cur = P(PKEY), prev = i > 0 ? P(keys[i - 1]) : null, n1 = P(yearAgo(PKEY));
   const O = DATA.objectifs;
+
+  /* --- fenêtre de comparaison -------------------------------------------
+     Période terminée  : on compare la période entière à la précédente entière.
+     Période en cours  : on compare les n jours écoulés aux n premiers jours
+                         de la période précédente et de celle de l'an dernier
+                         (« au 3 septembre » face au « 1er au 3 août »). */
+  const [ps, pe] = pBounds(PKEY);
+  const span = pe - ps;
+  const partial = CACHE.asOf < pe - 1;
+  const elapsed = partial ? Math.max(1, CACHE.asOf - ps + 1) : span;
+  const cur = sliceAgg(ps, ps + elapsed);
+  const prevK = i > 0 ? keys[i - 1] : null;
+  const n1K = yearAgo(PKEY);
+  const prev = prevK ? (() => { const [s] = pBounds(prevK); return sliceAgg(s, s + elapsed); })() : null;
+  const n1 = (() => { const [s] = pBounds(n1K); return sliceAgg(s, s + elapsed); })();
+  const winLbl = (k) => { const [s] = pBounds(k); return fmtD(s) + " → " + fmtD(s + elapsed - 1); };
+  CMP = {
+    partial, elapsed, span,
+    curLbl: fmtD(ps) + " → " + fmtD(ps + elapsed - 1),
+    prevLbl: prevK ? winLbl(prevK) : "—",
+    n1Lbl: (() => { const [s] = pBounds(n1K); return fmtDY(s) + " → " + fmtDY(s + elapsed - 1); })(),
+  };
+
+  const sqShort = Math.max(0, Math.min(ps + elapsed - 1, pe - 1) - CACHE.sqMax);
   const atl = atlFor(PKEY);
   const totalPole = cur.rec + cur.ven + cur.evt + cur.aju + cur.sqCa + (atl ? atl.total : 0);
 
-  $("hperiod").textContent = pLabel(PKEY);
+  $("hperiod").innerHTML = esc(pLabel(PKEY)) +
+    (partial ? ' <span style="color:var(--mut);font-size:.62em;font-weight:500">en cours · ' +
+      elapsed + (elapsed > 1 ? " jours" : " jour") + " sur " + span + "</span>" : "");
   $("hmeta").innerHTML = "Axonaut : " + esc(AXO_LABEL) + "<br>Square, Shopify, plateformes : figés au " +
     new Date(DATA.genere).toLocaleDateString("fr-FR");
-  $("ovsub").textContent = eur(totalPole) + " HT sur la période, tous pôles";
 
-  const mult = GRAN === "M" ? 1 : GRAN === "Q" ? 3 : 7 / 30.44;
+  /* objectif proratisé au nombre de jours réellement écoulés */
+  const mult = elapsed / 30.44;
   $("tiles").innerHTML =
     tile("B2B récurrent", cur.rec, prev ? prev.rec : null, n1.rec, O.b2b_recurrent_mensuel * mult,
       "consommables + locations machines") +
     tile("Coffeeshop Oberkampf", cur.sqCa, prev ? prev.sqCa : null, n1.sqCa, O.oberkampf_mensuel * mult,
       "net de remises, hors taxes") +
     tile("Ateliers", atl ? atl.total : 0, null, null, null,
-      atl ? "net de commissions — chantier en cours" : "non disponible à la semaine") +
+      !atl ? "non disponible à la semaine"
+        : partial ? "mois en cours — versements plateformes pas encore tombés"
+          : "net de commissions — chantier en cours") +
     tile("B2B vente", cur.ven, prev ? prev.ven : null, n1.ven, null,
       "machines, installations, ponctuel") +
     tile("Événements", cur.evt, prev ? prev.evt : null, n1.evt, null,
       "prestations barista, coffee corners");
-  $("ovnote").innerHTML = "Les objectifs mensuels de septembre sont proratisés sur la granularité choisie. " +
-    (GRAN === "W" ? "Le pôle ateliers n'existe qu'au mois : les versements des plateformes sont mensuels. " : "") +
+
+  $("ovsub").textContent = eur(totalPole) + " HT" + (partial ? " à date" : " sur la période") + ", tous pôles";
+  $("ovnote").innerHTML = (partial
+    ? "<b>Période en cours : " + elapsed + (elapsed > 1 ? " jours écoulés" : " jour écoulé") + " sur " + span +
+      ".</b> Les comparaisons portent sur la même durée de part et d'autre — " +
+      esc(CMP.curLbl) + " face à " + esc(CMP.prevLbl) + " et à " + esc(CMP.n1Lbl) +
+      " — et l'objectif est proratisé sur ces " + elapsed + (elapsed > 1 ? " jours" : " jour") + ". " +
+      (elapsed <= 7 ? "Sur une fenêtre aussi courte un pourcentage peut être trompeur : quand la base " +
+        "de comparaison est nulle ou négative, l'écart est affiché en euros. " : "")
+    : "Période complète : les comparaisons portent sur les périodes entières. ") +
+    (GRAN === "W" ? "Le pôle ateliers n'existe qu'au mois : les versements des plateformes sont mensuels. "
+      : partial ? "Le pôle ateliers, lui, reste sur le mois entier : les plateformes versent en une fois. " : "") +
     "Terrah Poissonnière n'a pas encore d'activité." +
-    (Math.abs(cur.aju) > 1 ? " Ajustements comptables sur la période : " + eur(cur.aju) + "." : "");
+    (Math.abs(cur.aju) > 1 ? " Ajustements comptables sur la période : " + eur(cur.aju) + "." : "") +
+    (sqShort > 0 ? ' <b style="color:var(--crit)">Attention : le figé Square s\'arrête au ' +
+      fmtD(CACHE.sqMax) + ", soit " + sqShort + (sqShort > 1 ? " jours" : " jour") +
+      " de moins que l'export Axonaut. Le CA du coffeeshop de cette période est sous-estimé " +
+      "et sa comparaison n'est pas fiable — il faut regénérer la page.</b>" : "");
 
   /* ---- B2B ---- */
   const CS = clientStats();
@@ -795,8 +886,9 @@ function render() {
   const N = GRAN === "W" ? 16 : GRAN === "Q" ? 8 : 13;
   const win = keys.slice(Math.max(0, i - N + 1), i + 1);
   $("chrec").innerHTML = svgBars(
-    win.map((k) => ({ label: pLabel(k), short: pShort(k), v: P(k).rec, cur: k === PKEY })),
-    { obj: O.b2b_recurrent_mensuel * mult, objLabel: "objectif " + eur(O.b2b_recurrent_mensuel * mult),
+    win.map((k) => ({ label: pLabel(k), short: pShort(k), v: P(k).rec, cur: k === PKEY,
+      partial: k === PKEY && partial })),
+    { obj: O.b2b_recurrent_mensuel * span / 30.44, objLabel: "objectif " + eur(O.b2b_recurrent_mensuel * span / 30.44),
       alt: "CA B2B récurrent par période", cls: "bar" });
   $("recnote").textContent = "CA récurrent sur les " + win.length + " dernières périodes. " +
     "Août est structurellement bas : les clients sont très majoritairement des bureaux et des cafés parisiens.";
@@ -894,21 +986,23 @@ function render() {
   const panier = cur.sqTk ? cur.sqCa / cur.sqTk : 0;
   const pPrev = prev && prev.sqTk ? prev.sqCa / prev.sqTk : null;
   const pN1 = n1.sqTk ? n1.sqCa / n1.sqTk : null;
-  $("shopsub").textContent = cur.sqTk.toLocaleString("fr-FR") + " passages · panier moyen " + eur(panier, 2);
+  $("shopsub").textContent = cur.sqTk.toLocaleString("fr-FR") + " passages · panier moyen " + eur(panier, 2) +
+    (partial ? " · à date" : "");
   $("shoptiles").innerHTML =
-    tile("Passages", cur.sqTk, prev ? prev.sqTk : null, n1.sqTk || null, null, "un ticket = un passage")
+    tile("Passages", cur.sqTk, prev ? prev.sqTk : null, n1.sqTk || null, null, "un ticket = un passage", false)
       .replace(eur(cur.sqTk), cur.sqTk.toLocaleString("fr-FR")) +
     tile("Panier moyen", panier, pPrev, pN1, null, "CA net ÷ nombre de tickets")
       .replace(eur(panier), eur(panier, 2));
   const shopWin = win.map((k) => {
     const b = P(k);
-    return { label: pLabel(k), short: pShort(k), v: b.sqCa, l: b.sqTk ? b.sqCa / b.sqTk : 0, cur: k === PKEY };
+    return { label: pLabel(k), short: pShort(k), v: b.sqCa, l: b.sqTk ? b.sqCa / b.sqTk : 0,
+      cur: k === PKEY, partial: k === PKEY && partial };
   }).filter((x) => x.v > 0);
   const ls = shopWin.map((x) => x.l);
   $("chshop").innerHTML = shopWin.length ? svgBars(shopWin, {
     cls: "bar2", pr: 46, alt: "CA et panier moyen du coffeeshop par période",
     line: true, lmin: Math.floor(Math.min(...ls) * 10) / 10 - 0.2, lmax: Math.ceil(Math.max(...ls) * 10) / 10 + 0.2,
-    obj: O.oberkampf_mensuel * mult, objLabel: "objectif " + eur(O.oberkampf_mensuel * mult),
+    obj: O.oberkampf_mensuel * span / 30.44, objLabel: "objectif " + eur(O.oberkampf_mensuel * span / 30.44),
   }) : '<p class="empty">Pas de données Square sur cette fenêtre.</p>';
   $("shopnote").innerHTML = "<b>Le panier monte, le flux baisse.</b> Sur l'année écoulée le panier moyen a gagné " +
     "près de 7 %, mais les passages ont reculé de près de 40 % depuis le pic d'octobre. " +
