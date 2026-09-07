@@ -361,15 +361,17 @@ a{color:var(--roast)}
   <p class="sublabel" id="shopnote"></p>
   <div class="duo">
     <div>
-      <h3 class="mini">Mix par catégorie — août 2026</h3>
+      <h3 class="mini">Mix par catégorie — <span id="mixlbl"></span>
+        <span class="eyebrow" id="mixprev"></span></h3>
       <div class="tbl"><table>
         <thead><tr><th>Catégorie</th><th class="n">CA HT</th><th class="n">Part</th><th class="n">vs juillet</th></tr></thead>
         <tbody id="mix"></tbody></table></div>
-      <p class="sublabel">Le mix et les produits lancés sont figés au 4 septembre 2026 :
-      ils viennent de Square, pas de l'export Axonaut.</p>
+      <p class="sublabel">Le mix suit la période choisie. Square ne le publie qu'au mois,
+      donc il n'existe ni à la semaine, ni sur la part écoulée d'un mois en cours :
+      dans ces cas le mois entier est affiché.</p>
     </div>
     <div>
-      <h3 class="mini">Produits lancés</h3>
+      <h3 class="mini">Produits lancés <span class="eyebrow">relevé juin → août 2026</span></h3>
       <div class="tbl"><table>
         <thead><tr><th>Produit</th><th class="n">Juin</th><th class="n">Juil</th><th class="n">Août</th>
           <th class="n">Part mix</th><th>Verdict</th></tr></thead>
@@ -378,7 +380,7 @@ a{color:var(--roast)}
       tendance monte, on tranche sinon. Au-dessus de 3 % → on garde.</p>
     </div>
   </div>
-  <h3 class="mini">Produits en chute</h3>
+  <h3 class="mini">Produits en chute <span class="eyebrow">relevé juin → août 2026</span></h3>
   <div class="tbl"><table>
     <thead><tr><th>Produit</th><th class="n">Juin</th><th class="n">Juil</th><th class="n">Août</th>
       <th class="n">Évolution</th></tr></thead>
@@ -747,6 +749,26 @@ function sliceAgg(d0, d1) {
 }
 const fmtD = (n) => dayToDate(n).toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "UTC" });
 const fmtDY = (n) => dayToDate(n).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "2-digit", timeZone: "UTC" });
+
+/* Mix par catégorie sur la période choisie. Square ne le fournit qu'au mois :
+   une semaine ne peut donc pas avoir son propre mix, on le dit plutôt que
+   d'inventer un découpage. */
+function mixFor(k) {
+  const g = k[0];
+  const mois = [];
+  if (g === "M") mois.push(k.slice(1));
+  else if (g === "Q") {
+    const [y, n] = k.slice(1).split("-");
+    for (let i = 0; i < 3; i++) mois.push(y + "-" + String((+n - 1) * 3 + i + 1).padStart(2, "0"));
+  } else return null;
+  const t = {};
+  let vu = false;
+  for (const m of mois)
+    for (const [c, v] of Object.entries((DATA.sqcatMois || {})[m] || {})) {
+      t[c] = (t[c] || 0) + v; vu = true;
+    }
+  return vu ? t : null;
+}
 
 function atlFor(k) {
   const g = k[0], months = [];
@@ -1160,14 +1182,22 @@ function render() {
     "près de 7 %, mais les passages ont reculé de près de 40 % depuis le pic d'octobre. " +
     "La hausse du panier masque la perte de fréquentation : c'est le flux qu'il faut regarder, pas le CA seul.";
 
-  const mix8 = DATA.sqcat["2026-08"], mix7 = DATA.sqcat["2026-07"];
-  const t8 = Object.values(mix8).reduce((s, v) => s + v, 0);
-  $("mix").innerHTML = Object.entries(mix8).sort((a, b) => b[1] - a[1]).map(([k, v]) => {
-    const o = mix7[k] || 0, d = o ? (v / o - 1) * 100 : null;
-    return "<tr><td class='cl'>" + esc(k) + "</td><td class='n'>" + eur(v) + "</td><td class='n'>" +
-      (v / t8 * 100).toFixed(1).replace(".", ",") + NB + "%</td><td class='n " + (d === null ? "" : evCls(d)) + "'>" +
-      (d === null ? "—" : pctTxt(d)) + "</td></tr>";
-  }).join("");
+  const mixCur = mixFor(PKEY), mixPrev = prevK ? mixFor(prevK) : null;
+  $("mixlbl").textContent = mixCur ? pLabel(PKEY) : "";
+  $("mixprev").textContent = mixPrev ? "vs " + pLabel(prevK) : "";
+  if (!mixCur) {
+    $("mix").innerHTML = "<tr><td colspan='4' class='empty'>Square ne fournit le mix " +
+      "qu'au mois : choisissez le mois ou le trimestre pour l'afficher.</td></tr>";
+  } else {
+    const tot = Object.values(mixCur).reduce((s, v) => s + v, 0);
+    $("mix").innerHTML = Object.entries(mixCur).sort((a, b) => b[1] - a[1]).map(([k, v]) => {
+      const o = (mixPrev || {})[k] || 0, d = o ? (v / o - 1) * 100 : null;
+      return "<tr><td class='cl'>" + esc(k) + "</td><td class='n'>" + eur(v) + "</td><td class='n'>" +
+        (v / tot * 100).toFixed(1).replace(".", ",") + NB + "%</td><td class='n " +
+        (d === null ? "" : evCls(d)) + "'>" + (d === null ? "—" : pctTxt(d)) + "</td></tr>";
+    }).join("") + "<tr><td class='cl'><b>Total</b></td><td class='n'><b>" + eur(tot) +
+      "</b></td><td class='n'><b>100" + NB + "%</b></td><td></td></tr>";
+  }
   $("lanc").innerHTML = DATA.lancements.map((L) => {
     const [nom, cat, j6, j7, j8, pm] = L;
     const v = pm >= 3 ? ["good", "on garde"] : pm >= 1 ? (j8 >= j7 ? ["warn", "on attend"] : ["crit", "à trancher"]) : ["crit", "on kill"];
@@ -1333,6 +1363,7 @@ function adopterBrut(brut) {
      n'est pas deviné : il est signalé, pour qu'une nouvelle référence ne se range
      pas en silence du mauvais côté. */
   const refProd = brut.produits || {};
+  const refNature = brut.naturesProduits || {};
   const inconnus = new Map();
 
   for (const l of brut.axonaut || []) {
@@ -1343,8 +1374,13 @@ function adopterBrut(brut) {
     if (!fi.has(f)) { fi.set(f, factures.length); factures.push(f); }
     let cat = (l.cat || "").trim();
     if (!cat) cat = refProd[l.p] || "";
-    const code = classify(cat, l.p, l.t);
-    if (!cat && CLASSIF_PAR_DEFAUT) {
+    /* Une nature imposée à la main l'emporte sur la règle de catégorie : un
+       cookie vendu une fois reste une vente, même si « Food » est du récurrent. */
+    const impose = refNature[l.p];
+    const code = impose ? (impose === "recurrent" ? 0 : impose === "evenement" ? 2 : 1)
+      : classify(cat, l.p, l.t);
+    if (impose) CLASSIF_PAR_DEFAUT = false;
+    if (!cat && !impose && CLASSIF_PAR_DEFAUT) {
       const e = inconnus.get(l.p) || { n: 0, ht: 0 };
       e.n++; e.ht += +l.ht || 0;
       inconnus.set(l.p, e);
@@ -1388,6 +1424,10 @@ function adopterBrut(brut) {
   return Object.assign({}, brut.statique || {}, {
     genere: brut.genere, clients, factures, ax, sq, atl,
     objectifs: brut.objectifs || {}, incidents: brut.incidents || [],
+    /* le mix mensuel et les référentiels vivent à la racine du fichier publié,
+       pas dans `statique` : sans cette ligne le tableau du mix reste vide */
+    sqcatMois: brut.sqcatMois || {},
+    produits: refProd, naturesProduits: refNature,
     aClasser: [...inconnus.entries()].map(([p, e]) => [p, e.n, e.ht])
       .sort((a, b) => Math.abs(b[2]) - Math.abs(a[2])),
   });
