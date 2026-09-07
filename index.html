@@ -73,17 +73,7 @@ body{background:var(--ground); color:var(--ink);
 
 /* ---- sources & import ---- */
 .sources{display:grid; grid-template-columns:1.15fr 1fr; gap:18px; align-items:stretch}
-.drop{border:1.5px dashed var(--line-2); border-radius:5px; background:var(--surface);
-  padding:18px; display:flex; flex-direction:column; gap:10px; justify-content:center;
-  transition:border-color .15s, background .15s}
-.drop.over{border-color:var(--roast); background:var(--roast-soft)}
-.drop h3{font-size:15px}
-.drop p{margin:0; font-size:13px; color:var(--mut)}
-.btn{align-self:flex-start; font-family:"IBM Plex Sans",sans-serif; font-size:13.5px; font-weight:500;
-  background:var(--ink); color:var(--ground); border:none; border-radius:4px;
-  padding:8px 16px; cursor:pointer}
-.btn:hover{background:var(--roast)}
-.btn:focus-visible{outline:2px solid var(--roast); outline-offset:2px}
+.sources-seule{grid-template-columns:1fr}
 .srcstate{background:var(--surface); border:1px solid var(--line); border-radius:5px; padding:14px 16px}
 .srcstate table{width:100%; font-size:12.5px; border-collapse:collapse}
 .srcstate td{padding:4px 0; border:none; vertical-align:top}
@@ -260,15 +250,7 @@ a{color:var(--roast)}
   <summary class="shead"><h2>Données</h2>
     <span class="sub">seul l'export Axonaut se met à jour depuis cette page</span><span class="secval" id="sv-donnees"></span></summary>
   <div class="secbody">
-  <div class="sources">
-    <div class="drop" id="drop">
-      <h3>Déposer le dernier export Axonaut</h3>
-      <p>Glissez le fichier <code>export_invoices…csv</code> ici, ou choisissez-le.
-         Le fichier reste dans votre navigateur : rien n'est envoyé nulle part, et la page
-         publiée sur GitHub n'est pas modifiée.</p>
-      <button class="btn" id="pick" type="button">Choisir un fichier</button>
-      <input type="file" id="file" accept=".csv,text/csv" hidden>
-    </div>
+  <div class="sources sources-seule">
     <div class="srcstate">
       <table><tbody id="srcrows"></tbody></table>
       <p class="note" id="srcnote" style="margin-top:10px"></p>
@@ -470,7 +452,6 @@ let SQ = [];
 let GRAN = "M";
 let PKEY = null;
 let CACHE = {};
-let AXO_LABEL = "livré avec la page";
 
 /* ------------------------------------------------------------- objectifs
    Les objectifs sont saisis à la main et gardés dans le navigateur : la page
@@ -623,62 +604,6 @@ function classify(cat, prod, titre) {
   if (c.indexOf("materiel") >= 0 || c.indexOf("machine") >= 0) return 1;
   CLASSIF_PAR_DEFAUT = true;
   return 1;
-}
-
-/* ------------------------------------------------------------- parsing CSV */
-function parseCSV(text) {
-  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
-  const rows = [];
-  let row = [], cur = "", q = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (q) {
-      if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; }
-      else cur += ch;
-    } else if (ch === '"') q = true;
-    else if (ch === ";") { row.push(cur); cur = ""; }
-    else if (ch === "\n") { row.push(cur); rows.push(row); row = []; cur = ""; }
-    else if (ch !== "\r") cur += ch;
-  }
-  if (cur !== "" || row.length) { row.push(cur); rows.push(row); }
-  return rows;
-}
-function frDate(s) {
-  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec((s || "").trim());
-  if (!m) return null;
-  return Math.round((Date.UTC(+m[3], +m[2] - 1, +m[1]) - EPOCH) / DAY);
-}
-function frNum(s) { return parseFloat((s || "0").replace(/\s/g, "").replace(",", ".")) || 0; }
-
-function ingest(text) {
-  const rows = parseCSV(text);
-  if (rows.length < 2) throw new Error("fichier vide ou illisible");
-  const hdr = rows[0].map(norm);
-  const col = (name) => {
-    const i = hdr.indexOf(norm(name));
-    if (i < 0) throw new Error("colonne « " + name + " » absente du fichier");
-    return i;
-  };
-  const cF = col("ID Facture"), cD = col("Date de la facture"), cC = col("Catégorie du produit"),
-    cP = col("Date de paiement de la facture"), cH = col("Montant total HT"),
-    cN = col("nom du client"), cPr = col("Nom du produit"), cT = col("Titre de la ligne de facture");
-  const clients = [], cmap = new Map(), factures = [], fmap = new Map(), ax = [];
-  let skipped = 0;
-  for (let i = 1; i < rows.length; i++) {
-    const r = rows[i];
-    if (r.length < hdr.length || !r[cD]) { skipped++; continue; }
-    const d = frDate(r[cD]);
-    if (d === null) { skipped++; continue; }
-    const cl = (r[cN] || "").trim();
-    if (!cmap.has(cl)) { cmap.set(cl, clients.length); clients.push(cl); }
-    const fa = r[cF];
-    if (!fmap.has(fa)) { fmap.set(fa, factures.length); factures.push(fa); }
-    const pd = frDate(r[cP]);
-    ax.push([d, cmap.get(cl), Math.round(frNum(r[cH]) * 100),
-      classify(r[cC], r[cPr], r[cT]), pd === null ? -1 : pd, fmap.get(fa)]);
-  }
-  if (!ax.length) throw new Error("aucune ligne de facture exploitable");
-  return { ax, clients, factures, skipped, total: ax.reduce((s, a) => s + a[2], 0) / 100 };
 }
 
 /* ------------------------------------------------------------- agrégation */
@@ -926,7 +851,7 @@ function render() {
       elapsed + (elapsed > 1 ? " jours" : " jour") + " sur " + span + "</span>" : "");
   $("hmeta").innerHTML = "Données publiées le " +
     (DATA.genere ? new Date(DATA.genere).toLocaleDateString("fr-FR") : "?") +
-    "<br>Axonaut : " + esc(AXO_LABEL);
+    "<br>rafraîchies chaque lundi matin";
 
   /* Objectif d'une période ENTIÈRE : un mois vaut l'objectif mensuel tel quel,
      un trimestre en vaut trois, une semaine en vaut 7/30,44. Puis, si la période
@@ -1200,10 +1125,9 @@ function renderSources() {
     "<tr><td><span class='" + (frais ? "dot-ok" : "dot-fix") + "'></span>" + esc(nom) +
     "</td><td>" + detail + "</td></tr>";
 
-  const axoFrais = AXO_LABEL.indexOf("importé") === 0 || !vieux;
   $("srcrows").innerHTML =
-    ligne("Axonaut — factures", axoFrais,
-      esc(AXO_LABEL) + " · " + AX.length.toLocaleString("fr-FR") +
+    ligne("Axonaut — factures", !vieux,
+      AX.length.toLocaleString("fr-FR") +
       " lignes<br>dernière facture le " + jour(CACHE.asOf)) +
     ligne("Square — coffeeshop", !vieux,
       SQ.length + " jours<br>dernier jour couvert : " + jour(CACHE.sqMax)) +
@@ -1221,54 +1145,7 @@ function renderSources() {
       "Axonaut prend le pas sur lui, le temps de votre visite.";
 }
 
-function showMsg(txt, cls) {
-  const m = $("msg");
-  m.textContent = txt;
-  m.className = cls;
-}
-
-function loadFile(f) {
-  if (!f) return;
-  if (!/\.csv$/i.test(f.name)) { showMsg("Ce n'est pas un fichier .csv — attendu : l'export de factures Axonaut.", "err"); return; }
-  const r = new FileReader();
-  r.onerror = () => showMsg("Le fichier n'a pas pu être lu.", "err");
-  r.onload = () => {
-    try {
-      const res = ingest(String(r.result));
-      AX = res.ax; CLIENTS = res.clients; FACTURES = res.factures;
-      AXO_LABEL = "importé (" + f.name + ")";
-      if (!DATA) DATA = { objectifs: {}, statique: {} };
-      document.querySelectorAll(".sec").forEach((s) => { s.hidden = false; });
-      const pb = document.querySelector(".periodbar");
-      if (pb) pb.hidden = false;
-      document.getElementById("wrap").hidden = false;
-      build();
-      renderPeriodSelect();
-      renderObj();
-      render();
-      renderSources();
-      showMsg("Import réussi : " + res.ax.length.toLocaleString("fr-FR") + " lignes, " +
-        res.clients.length + " clients, total " + eur(res.total) + " HT" +
-        (res.skipped ? " — " + res.skipped + " ligne(s) ignorée(s), sans date exploitable." : ".") +
-        " Le coffeeshop reste sur les données du dernier rafraîchissement.", "ok");
-    } catch (err) {
-      showMsg("Import impossible : " + err.message, "err");
-    }
-  };
-  r.readAsText(f, "utf-8");
-}
-
 /* --------------------------------------------------------------- écouteurs */
-$("pick").addEventListener("click", () => $("file").click());
-$("file").addEventListener("change", (e) => loadFile(e.target.files[0]));
-const drop = $("drop");
-["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => {
-  e.preventDefault(); drop.classList.add("over");
-}));
-["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => {
-  e.preventDefault(); drop.classList.remove("over");
-}));
-drop.addEventListener("drop", (e) => loadFile(e.dataTransfer.files[0]));
 document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => {
   document.querySelectorAll(".seg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
   const old = PKEY ? pRange(PKEY)[0] : null;
@@ -1321,7 +1198,8 @@ function secResume(cur, totalPole, actifs, relance, churn, s30, n30, panier) {
   p("sv-shop", "<b>" + eur(cur.sqCa) + "</b> · " + cur.sqTk.toLocaleString("fr-FR") +
     " passages · " + eur(panier, 2));
   p("sv-poisso", (DATA.poisso || []).filter((x) => x.statut !== "fait").length + " chantiers en cours");
-  p("sv-donnees", "Axonaut : " + esc(AXO_LABEL));
+  p("sv-donnees", "publiées le " + (DATA.genere
+    ? new Date(DATA.genere).toLocaleDateString("fr-FR") : "?"));
   const modif = OBJ_SPEC.filter((x) => OBJ[x.k] !== OBJ_DEF[x.k]).length;
   p("sv-objectifs", modif ? modif + " modifié" + (modif > 1 ? "s" : "") : "valeurs livrées");
 }
@@ -1350,9 +1228,29 @@ function boot() {
    La règle métier ne vit donc qu'ici, et un fichier déposé à la main passe par
    exactement le même chemin qu'un rafraîchissement automatique. */
 function adopterBrut(brut) {
+  /* Tout ce que Make se contente de recopier — référentiel produits, objectifs,
+     historique Square, mix mensuel, blocs figés — vit dans un seul objet `socle`,
+     stocké à part dans le dépôt. Make l'injecte tel quel, sans le comprendre :
+     il n'a donc aucune structure à reconstruire, et rien à recalculer.
+     Ce que le scénario produit lui-même (axonaut, squareBrut, genere) l'emporte. */
+  if (brut && brut.socle) brut = Object.assign({}, brut.socle, brut);
+
   const clients = [], ci = new Map(), factures = [], fi = new Map(), ax = [];
-  const jour = (d) => d ? Math.round((Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1,
-    +d.slice(8, 10)) - EPOCH) / DAY) : -1;
+  /* Les dates arrivent selon la source : « 2026-09-01 » par l'API, « 01/09/2026 »
+     par l'export CSV, parfois avec une heure collée derrière. On accepte les deux
+     plutôt que de parier sur l'une — un format inattendu doit se voir, pas se
+     transformer en 1970. */
+  const jour = (v) => {
+    if (!v) return -1;
+    const s = String(v).trim();
+    let a, m, j;
+    let g = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+    if (g) { a = +g[1]; m = +g[2]; j = +g[3]; }
+    else if ((g = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(s))) { j = +g[1]; m = +g[2]; a = +g[3]; }
+    else return -1;
+    if (a < 2000 || a > 2100 || m < 1 || m > 12 || j < 1 || j > 31) return -1;
+    return Math.round((Date.UTC(a, m - 1, j) - EPOCH) / DAY);
+  };
 
   /* L'API Axonaut ne rend pas la catégorie produit — seul l'export CSV la porte.
      Sans elle, tout le café basculerait de récurrent à vente. On la retrouve donc
@@ -1363,7 +1261,18 @@ function adopterBrut(brut) {
   const refNature = brut.naturesProduits || {};
   const inconnus = new Map();
 
-  for (const l of brut.axonaut || []) {
+  /* L'API Axonaut plafonne le nombre de résultats : impossible de rapatrier deux
+     ans d'un coup. Le scénario ne rapporte donc que les factures modifiées
+     récemment, et l'historique dort dans le socle. Une facture présente dans le
+     lot frais remplace entièrement sa version historique — c'est ce qui fait
+     qu'un vieil impayé enfin réglé disparaît bien de la liste. */
+  const frais = brut.axonaut || [];
+  const vues = new Set(frais.map((l) => String(l.f)));
+  const lignes = (brut.axonautHistorique || [])
+    .filter((l) => !vues.has(String(l.f)))
+    .concat(frais);
+
+  for (const l of lignes) {
     if (!l.d) continue;
     const c = (l.c || "").trim();
     if (!ci.has(c)) { ci.set(c, clients.length); clients.push(c); }
@@ -1440,11 +1349,10 @@ async function demarrerEnClair() {
        On le dit gros et en haut, plutôt que dans une tuile qu'on ne lit pas. */
     document.getElementById("wrap").hidden = false;
     $("msg").className = "err";
-    $("msg").innerHTML = "<b>Les chiffres ne sont pas encore publiés</b> (" + esc(e.message) +
-      "). La page fonctionne quand même : <b>déposez votre export Axonaut dans la zone " +
-      "ci-dessus</b> et tout se calculera dans votre navigateur. Le fichier " +
-      "<code>data.json</code> est publié par le scénario Make ; s'il manque, c'est " +
-      "qu'il n'a pas encore tourné.";
+    $("msg").innerHTML = "<b>Les chiffres ne sont pas disponibles</b> (" + esc(e.message) +
+      "). Le fichier <code>data.json</code> est publié chaque lundi matin par le scénario " +
+      "Make : s'il manque, c'est que le scénario n'a pas tourné. Ouvrez Make, lancez " +
+      "« Terrah — rafraîchir le dashboard » à la main, puis rechargez cette page.";
     document.querySelectorAll(".sec").forEach((s, i) => { if (i > 1) s.hidden = true; });
     document.querySelector(".periodbar").hidden = true;
     return;
