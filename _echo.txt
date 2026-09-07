@@ -1,0 +1,1 @@
+SHA=ab823bef89e4bd7135d8bf7b769b4ed80eb84030|TAILLE=80|DEBUT=Ce fichier a ete ecrit par Make pour verifier les droits. Il
