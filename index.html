@@ -47,6 +47,30 @@ body{background:var(--ground); color:var(--ink);
 .wrap{max-width:1080px; margin:0 auto; padding:32px 22px 80px; display:flex; flex-direction:column; gap:40px}
 .wrap[hidden]{display:none}
 
+/* ---- sections dépliables ----
+   <details>/<summary> est natif : ça marche au clavier, sans JavaScript, et
+   l'état ouvert/fermé est un attribut du DOM qu'on peut mémoriser. */
+.sec{border-bottom:1px solid var(--line-2)}
+.sec > summary{list-style:none; cursor:pointer}
+.sec > summary::-webkit-details-marker{display:none}
+.shead{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;
+  padding:13px 0 13px 26px; position:relative}
+.shead h2{font-size:20px; font-weight:600; letter-spacing:.01em}
+.shead .sub{font-size:13px; color:var(--mut)}
+.shead::before{content:"›"; position:absolute; left:5px; top:50%; margin-top:-.66em;
+  font-size:19px; line-height:1; color:var(--mut); display:inline-block;
+  transform-origin:52% 56%; transition:transform .15s ease, color .15s ease}
+.sec[open] > summary .shead::before{transform:rotate(90deg)}
+.sec > summary:hover .shead::before{color:var(--roast)}
+.sec > summary:focus-visible{outline:2px solid var(--roast); outline-offset:-2px; border-radius:3px}
+.secval{margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:12.5px;
+  font-variant-numeric:tabular-nums; color:var(--mut); text-align:right}
+.secval:empty{display:none}
+.secval b{color:var(--ink); font-weight:600}
+.secval .crit{color:var(--crit); font-weight:600}
+.sec[open] > summary .shead{border-bottom:1px solid var(--line)}
+.secbody{display:flex; flex-direction:column; gap:16px; padding:16px 0 24px}
+
 /* ---- sources & import ---- */
 .sources{display:grid; grid-template-columns:1.15fr 1fr; gap:18px; align-items:stretch}
 .drop{border:1.5px dashed var(--line-2); border-radius:5px; background:var(--surface);
@@ -92,7 +116,7 @@ body{background:var(--ground); color:var(--ink);
 #msg.err{display:block; background:var(--crit-soft); color:var(--crit); border-left:3px solid var(--crit)}
 
 /* ---- selecteur de periode ---- */
-.periodbar{display:flex; flex-wrap:wrap; gap:14px; align-items:center;
+.periodbar{margin:10px 0; display:flex; flex-wrap:wrap; gap:14px; align-items:center;
   background:var(--raise); border:1px solid var(--line); border-radius:5px; padding:10px 14px;
   position:sticky; top:0; z-index:5}
 .seg{display:inline-flex; border:1px solid var(--line-2); border-radius:4px; overflow:hidden}
@@ -232,9 +256,10 @@ a{color:var(--roast)}
   <div class="meta" id="hmeta"></div>
 </header>
 
-<section>
-  <div class="shead"><h2>Données</h2>
-    <span class="sub">seul l'export Axonaut se met à jour depuis cette page</span></div>
+<details class="sec" id="sec-donnees">
+  <summary class="shead"><h2>Données</h2>
+    <span class="sub">seul l'export Axonaut se met à jour depuis cette page</span><span class="secval" id="sv-donnees"></span></summary>
+  <div class="secbody">
   <div class="sources">
     <div class="drop" id="drop">
       <h3>Déposer le dernier export Axonaut</h3>
@@ -248,23 +273,22 @@ a{color:var(--roast)}
       <table><tbody>
         <tr><td><span class="dot-ok"></span>Axonaut</td><td id="s-axo">—</td></tr>
         <tr><td><span class="dot-fix"></span>Square — coffeeshop</td><td id="s-sq">—</td></tr>
-        <tr><td><span class="dot-fix"></span>Shopify — ateliers direct</td><td id="s-shop">—</td></tr>
-        <tr><td><span class="dot-fix"></span>Wecandoo / Funbooker</td><td id="s-atl">—</td></tr>
       </tbody></table>
       <p class="note" style="margin-top:10px">Les sources marquées en orange sont figées à la date
       de génération de la page : elles ne peuvent pas se rafraîchir depuis un site statique.
       Il faut regénérer la page pour les mettre à jour.</p>
     </div>
   </div>
-  <div id="msg" role="status"></div>
-</section>
+  <div id="msg" role="status"></div></div>
+</details>
 
-<section>
-  <div class="shead"><h2>Objectifs</h2>
-    <span class="sub">saisis à la main · conservés dans ce navigateur</span></div>
+<details class="sec" id="sec-objectifs">
+  <summary class="shead"><h2>Objectifs</h2>
+    <span class="sub">saisis à la main · conservés dans ce navigateur</span><span class="secval" id="sv-objectifs"></span></summary>
+  <div class="secbody">
   <div class="objgrid" id="objgrid"></div>
-  <p class="sublabel" id="objnote"></p>
-</section>
+  <p class="sublabel" id="objnote"></p></div>
+</details>
 
 <div class="periodbar">
   <div class="seg" role="group" aria-label="Granularité">
@@ -279,16 +303,18 @@ a{color:var(--roast)}
   <span class="cur" id="pcur"></span>
 </div>
 
-<section>
-  <div class="shead"><h2>Vue d'ensemble</h2><span class="sub" id="ovsub"></span></div>
+<details class="sec" id="sec-ensemble">
+  <summary class="shead"><h2>Vue d'ensemble</h2><span class="sub" id="ovsub"></span><span class="secval" id="sv-ensemble"></span></summary>
+  <div class="secbody">
   <div class="alerte" id="alerte"></div>
   <div class="tiles" id="tiles"></div>
   <div class="ytd" id="ytd"></div>
-  <p class="sublabel" id="ovnote"></p>
-</section>
+  <p class="sublabel" id="ovnote"></p></div>
+</details>
 
-<section>
-  <div class="shead"><h2>Impayés</h2><span class="sub">à date, indépendant de la période choisie</span></div>
+<details class="sec" id="sec-impayes">
+  <summary class="shead"><h2>Impayés</h2><span class="sub">à date, indépendant de la période choisie</span><span class="secval" id="sv-impayes"></span></summary>
+  <div class="secbody">
   <div class="banner">
     <div><div class="bnum" id="imp30">—</div><div class="eyebrow" id="imp30n"></div></div>
     <p id="imptxt"></p>
@@ -300,11 +326,12 @@ a{color:var(--roast)}
     <div class="tbl"><table>
       <thead><tr><th>Plus gros impayés &gt; 30 j</th><th class="n">HT</th><th class="n">Âge</th><th class="n">Facture</th></tr></thead>
       <tbody id="imptop"></tbody></table></div>
-  </div>
-</section>
+  </div></div>
+</details>
 
-<section>
-  <div class="shead"><h2>B2B</h2><span class="sub">récurrent suivi seul, ventes à part</span></div>
+<details class="sec" id="sec-b2b">
+  <summary class="shead"><h2>B2B</h2><span class="sub">récurrent suivi seul, ventes à part</span><span class="secval" id="sv-b2b"></span></summary>
+  <div class="secbody">
   <div class="kpis" id="b2bkpi"></div>
   <div class="chart" id="chrec"></div>
   <p class="sublabel" id="recnote"></p>
@@ -347,11 +374,12 @@ a{color:var(--roast)}
       <h3 class="mini">Pipeline</h3>
       <p class="sublabel" id="pipetxt"></p>
     </div>
-  </div>
-</section>
+  </div></div>
+</details>
 
-<section>
-  <div class="shead"><h2>Coffeeshop Oberkampf</h2><span class="sub" id="shopsub"></span></div>
+<details class="sec" id="sec-shop">
+  <summary class="shead"><h2>Coffeeshop Oberkampf</h2><span class="sub" id="shopsub"></span><span class="secval" id="sv-shop"></span></summary>
+  <div class="secbody">
   <div class="tiles" id="shoptiles"></div>
   <div class="chart" id="chshop"></div>
   <div class="legend">
@@ -364,7 +392,7 @@ a{color:var(--roast)}
       <h3 class="mini">Mix par catégorie — <span id="mixlbl"></span>
         <span class="eyebrow" id="mixprev"></span></h3>
       <div class="tbl"><table>
-        <thead><tr><th>Catégorie</th><th class="n">CA HT</th><th class="n">Part</th><th class="n">vs juillet</th></tr></thead>
+        <thead><tr><th>Catégorie</th><th class="n">CA HT</th><th class="n">Part</th><th class="n" id="mixcol">vs préc.</th></tr></thead>
         <tbody id="mix"></tbody></table></div>
       <p class="sublabel">Le mix suit la période choisie. Square ne le publie qu'au mois,
       donc il n'existe ni à la semaine, ni sur la part écoulée d'un mois en cours :
@@ -388,56 +416,23 @@ a{color:var(--roast)}
   <p class="sublabel">La catégorie <b>SOIR</b> a fait 10 € en juillet et 10 € en août : l'offre du soir
   est morte, pas en difficulté. <b>FORMULE TOAST</b> tombe à zéro parce qu'elle a été remplacée par
   <b>FORMULE SALÉ</b>. À noter : « OEUF À LA COQUE » et « Oeuf à la coque » sont deux fiches distinctes
-  dans le catalogue Square, ce qui divise leurs ventes en deux.</p>
-</section>
+  dans le catalogue Square, ce qui divise leurs ventes en deux.</p></div>
+</details>
 
-<section>
-  <div class="shead"><h2>Ateliers</h2><span class="sub">chantier en cours</span></div>
-  <div class="wip">
-    <span class="wipbadge">⚠ Work in progress — chiffres non fiables</span>
-    <div class="wipwhy">
-      <p style="margin:0"><b>Ce bloc ne doit pas servir à décider tant que ces trois points ne sont pas réglés.</b></p>
-      <ul>
-        <li><b>Trois mois manquants.</b> Les versements Wecandoo de février, avril et mai 2026
-        sont introuvables dans la boîte mail. Ces mois sont sous-estimés et leur part « direct »
-        est mécaniquement fausse — sur mai elle affiche 94 %, ce qui n'a aucun sens.</li>
-        <li><b>Pas de taux de remplissage.</b> C'est l'indicateur qui compte pour ce pôle, et la
-        jauge n'est disponible ni dans Wecandoo par mail, ni ailleurs. Il faut un export du
-        back-office Wecandoo pour l'obtenir.</li>
-        <li><b>Part Shopify estimée.</b> Le CA Shopify mélange ateliers et café vendu en ligne ;
-        la répartition est une estimation à partir du poids des deux produits « Atelier » sur 13 mois,
-        pas un chiffre lu.</li>
-      </ul>
-      <p style="margin:10px 0 0">Ce qui est affiché ci-dessous vient des versements réellement reçus,
-      donc nets de commission. C'est juste pour les mois complets, faux pour les trois mois signalés.</p>
-    </div>
-    <div class="wipbody">
-      <div class="chart" id="chatl"></div>
-      <div class="legend">
-        <span><i class="sw" style="background:var(--roast)"></i>Wecandoo</span>
-        <span><i class="sw" style="background:var(--warn)"></i>Funbooker</span>
-        <span><i class="sw" style="background:var(--green)"></i>Shopify (direct, sans commission)</span>
-        <span style="color:var(--crit)">! versement manquant</span>
-      </div>
-      <div class="tbl"><table>
-        <thead><tr><th>Mois</th><th class="n">Wecandoo</th><th class="n">Funbooker</th>
-          <th class="n">Shopify</th><th class="n">Total net</th><th class="n">% direct</th><th></th></tr></thead>
-        <tbody id="atl"></tbody></table></div>
-    </div>
-  </div>
-</section>
-
-<section>
-  <div class="shead"><h2>Poisso</h2><span class="sub">soft launch le 23/09/2026</span></div>
+<details class="sec" id="sec-poisso">
+  <summary class="shead"><h2>Poisso</h2><span class="sub">soft launch le 23/09/2026</span><span class="secval" id="sv-poisso"></span></summary>
+  <div class="secbody">
   <div class="tbl"><table>
     <thead><tr><th>Chantier</th><th>Statut</th></tr></thead>
     <tbody id="poisso"></tbody></table></div>
   <p class="sublabel">Terrah Poissonnière est une société distincte : le comptable demande de bien
   séparer fournisseurs et raisons sociales sur les factures dès maintenant. Le pôle apparaîtra
-  dans la vue d'ensemble à l'ouverture.</p>
-</section>
+  dans la vue d'ensemble à l'ouverture.</p></div>
+</details>
 
-<section>
+<details class="sec" id="sec-methode">
+  <summary class="shead"><h2>Méthode</h2><span class="sub">sources, règles de classement et limites</span><span class="secval" id="sv-methode">comment les chiffres sont fabriqués</span></summary>
+  <div class="secbody">
   <div class="method">
     <h3>Méthode, sources et limites</h3>
     <ul>
@@ -459,8 +454,8 @@ a{color:var(--roast)}
       3 commandes exclus. Seuils repris de la page farming : 0,86× à relancer, 1× risque de churn,
       3× considéré comme perdu.</li>
     </ul>
-  </div>
-</section>
+  </div></div>
+</details>
 
 </div>
 
@@ -490,12 +485,11 @@ let AXO_LABEL = "livré avec la page";
 const OBJ_SPEC = [
   { k: "b2b_recurrent_mensuel", lbl: "B2B récurrent", per: "par mois" },
   { k: "oberkampf_mensuel", lbl: "Coffeeshop Oberkampf", per: "par mois" },
-  { k: "ateliers_mensuel", lbl: "Ateliers", per: "par mois" },
   { k: "evenements_mensuel", lbl: "Événements", per: "par mois" },
   { k: "b2b_vente_annuel", lbl: "B2B vente", per: "par an" },
 ];
 const OBJ_KEY = "terrah.objectifs.v1";
-const OBJ_DEF = { ateliers_mensuel: 0, evenements_mensuel: 0 };
+const OBJ_DEF = { evenements_mensuel: 0 };
 let OBJ = Object.assign({}, OBJ_DEF);
 let OBJ_STORE_OK = true;
 
@@ -770,22 +764,6 @@ function mixFor(k) {
   return vu ? t : null;
 }
 
-function atlFor(k) {
-  const g = k[0], months = [];
-  if (g === "M") months.push(k.slice(1));
-  else if (g === "Q") {
-    const [y, n] = k.slice(1).split("-");
-    for (let i = 0; i < 3; i++) months.push(y + "-" + String((+n - 1) * 3 + i + 1).padStart(2, "0"));
-  } else return null;
-  let w = 0, f = 0, s = 0, gap = false, any = false;
-  for (const m of months) {
-    const a = DATA.atl[m];
-    if (!a) continue;
-    any = true; w += a[0]; f += a[1]; s += a[2]; gap = gap || a[3];
-  }
-  return any ? { w, f, s, total: w + f + s, gap } : null;
-}
-
 /* ------------------------------------------------------- clients & impayés */
 function clientStats() {
   const last = new Map(), first = new Map(), dates = new Map(), inv = new Map();
@@ -946,8 +924,7 @@ function render() {
   };
 
   const sqShort = Math.max(0, Math.min(ps + elapsed - 1, pe - 1) - CACHE.sqMax);
-  const atl = atlFor(PKEY);
-  const totalPole = cur.rec + cur.ven + cur.evt + cur.aju + cur.sqCa + (atl ? atl.total : 0);
+  const totalPole = cur.rec + cur.ven + cur.evt + cur.aju + cur.sqCa;
 
   $("hperiod").innerHTML = esc(pLabel(PKEY)) +
     (partial ? ' <span style="color:var(--mut);font-size:.62em;font-weight:500">en cours · ' +
@@ -966,10 +943,6 @@ function render() {
       "consommables + locations machines", true, "AX") +
     tile("Coffeeshop Oberkampf", cur.sqCa, prev ? prev.sqCa : null, n1.sqCa, O.oberkampf_mensuel * mult,
       "net de remises, hors taxes", true, "SQ") +
-    tile("Ateliers", atl ? atl.total : 0, null, null, O.ateliers_mensuel * mult,
-      !atl ? "non disponible à la semaine"
-        : partial ? "mois en cours — versements plateformes pas encore tombés"
-          : "net de commissions — chantier en cours") +
     tile("B2B vente", cur.ven, prev ? prev.ven : null, n1.ven, null,
       "machines, installations, ponctuel", true, "AX") +
     tile("Événements", cur.evt, prev ? prev.evt : null, n1.evt, O.evenements_mensuel * mult,
@@ -1014,8 +987,6 @@ function render() {
       (elapsed <= 7 ? "Sur une fenêtre aussi courte un pourcentage peut être trompeur : quand la base " +
         "de comparaison est nulle ou négative, l'écart est affiché en euros. " : "")
     : "Période complète : les comparaisons portent sur les périodes entières. ") +
-    (GRAN === "W" ? "Le pôle ateliers n'existe qu'au mois : les versements des plateformes sont mensuels. "
-      : partial ? "Le pôle ateliers, lui, reste sur le mois entier : les plateformes versent en une fois. " : "") +
     "Terrah Poissonnière n'a pas encore d'activité." +
     (Math.abs(cur.aju) > 1 ? " Ajustements comptables sur la période : " + eur(cur.aju) + "." : "") +
     (sqShort > 0 ? ' <b style="color:var(--crit)">Attention : le figé Square s\'arrête au ' +
@@ -1185,6 +1156,7 @@ function render() {
   const mixCur = mixFor(PKEY), mixPrev = prevK ? mixFor(prevK) : null;
   $("mixlbl").textContent = mixCur ? pLabel(PKEY) : "";
   $("mixprev").textContent = mixPrev ? "vs " + pLabel(prevK) : "";
+  $("mixcol").textContent = mixPrev ? "vs " + pLabel(prevK) : "vs préc.";
   if (!mixCur) {
     $("mix").innerHTML = "<tr><td colspan='4' class='empty'>Square ne fournit le mix " +
       "qu'au mois : choisissez le mois ou le trimestre pour l'afficher.</td></tr>";
@@ -1211,40 +1183,7 @@ function render() {
       "</td><td class='n'>" + eur(j8) + "</td><td class='n down'>" + pctTxt(ev) + "</td></tr>";
   }).join("");
 
-  /* ---- ateliers (WIP) ---- */
-  const am = Object.keys(DATA.atl).sort().filter((m) => m >= "2025-09");
-  $("chatl").innerHTML = (() => {
-    const W = 980, H = 220, PL = 62, PR = 24, PT = 22, PB = 50;
-    const iw = W - PL - PR, ih = H - PT - PB, vmax = 7000;
-    const step = iw / am.length, bw = step * 0.56;
-    let o = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="CA ateliers net par canal">';
-    for (let t = 0; t <= 2; t++) {
-      const gv = vmax * t / 2, y = PT + ih - gv / vmax * ih;
-      o += '<line x1="' + PL + '" y1="' + y.toFixed(1) + '" x2="' + (PL + iw) + '" y2="' + y.toFixed(1) + '" class="grid"/>';
-      o += '<text x="' + (PL - 10) + '" y="' + (y + 4).toFixed(1) + '" class="ax ar">' + (gv / 1000).toFixed(1).replace(".", ",") + "k</text>";
-    }
-    am.forEach((m, i) => {
-      const a = DATA.atl[m], x = PL + i * step + (step - bw) / 2;
-      let y = PT + ih;
-      [[a[0], "st1"], [a[1], "st2"], [a[2], "st3"]].forEach(([v, cls]) => {
-        const h = v / vmax * ih;
-        if (h > 0.4) { y -= h; o += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '" class="' + cls + '"/>'; }
-      });
-      const d = new Date(m + "-01T00:00:00Z");
-      o += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - PB + 17) + '" class="ax am">' +
-        MOISFR[d.getUTCMonth()] + NB + m.slice(2, 4) + "</text>";
-      if (a[3]) o += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - PB + 32) + '" class="ax am" fill="var(--crit)" font-weight="700">!</text>';
-    });
-    return o + "</svg>";
-  })();
-  $("atl").innerHTML = am.map((m) => {
-    const a = DATA.atl[m], t = a[0] + a[1] + a[2];
-    const d = new Date(m + "-01T00:00:00Z");
-    return "<tr><td class='cl'>" + MOISFR[d.getUTCMonth()] + " " + m.slice(0, 4) + "</td><td class='n'>" + eur(a[0]) +
-      "</td><td class='n'>" + eur(a[1]) + "</td><td class='n'>" + eur(a[2]) + "</td><td class='n'>" + eur(t) +
-      "</td><td class='n'>" + (t ? (a[2] / t * 100).toFixed(0) + NB + "%" : "—") + "</td><td>" +
-      (a[3] ? "<span class='pill crit'>versement manquant</span>" : "") + "</td></tr>";
-  }).join("");
+  secResume(cur, totalPole, actifs, rec.length, churn.length, s30, n30, panier);
 
   $("poisso").innerHTML = DATA.poisso.map((p) =>
     "<tr><td class='cl'>" + esc(p.chantier) + "</td><td><span class='pill " +
@@ -1258,8 +1197,6 @@ function renderSources() {
     d.toLocaleDateString("fr-FR", { timeZone: "UTC" });
   const g = new Date(DATA.genere).toLocaleDateString("fr-FR");
   $("s-sq").textContent = "figé au " + g + " · " + SQ.length + " jours";
-  $("s-shop").textContent = "figé au " + g;
-  $("s-atl").textContent = "figé au " + g + " · 3 mois incomplets";
 }
 
 function showMsg(txt, cls) {
@@ -1279,7 +1216,7 @@ function loadFile(f) {
       AX = res.ax; CLIENTS = res.clients; FACTURES = res.factures;
       AXO_LABEL = "importé (" + f.name + ")";
       if (!DATA) DATA = { objectifs: {}, statique: {} };
-      document.querySelectorAll("section").forEach((s) => { s.hidden = false; });
+      document.querySelectorAll(".sec").forEach((s) => { s.hidden = false; });
       const pb = document.querySelector(".periodbar");
       if (pb) pb.hidden = false;
       document.getElementById("wrap").hidden = false;
@@ -1330,13 +1267,50 @@ $("next").addEventListener("click", () => {
   if (i < k.length - 1) { PKEY = k[i + 1]; renderPeriodSelect(); render(); }
 });
 
+/* --------------------------------------------------- sections dépliables
+   Tout est replié au départ. L'état est gardé par navigateur, comme les
+   objectifs : chacun retrouve les sections qu'il avait ouvertes. */
+const SEC_KEY = "terrah.sections.v1";
+
+function secLire() {
+  try { return JSON.parse(localStorage.getItem(SEC_KEY) || "{}"); } catch (e) { return {}; }
+}
+function secEcrire(o) {
+  try { localStorage.setItem(SEC_KEY, JSON.stringify(o)); } catch (e) { /* onglet privé */ }
+}
+function secInit() {
+  const etat = secLire();
+  document.querySelectorAll(".sec").forEach((d) => {
+    d.open = etat[d.id] === true;
+    d.addEventListener("toggle", () => {
+      const e = secLire();
+      e[d.id] = d.open;
+      secEcrire(e);
+    });
+  });
+}
+
+/* Une section repliée doit rester lisible : on met son chiffre clé dans l'en-tête. */
+function secResume(cur, totalPole, actifs, relance, churn, s30, n30, panier) {
+  const p = (id, html) => { const el = $(id); if (el) el.innerHTML = html; };
+  p("sv-ensemble", "<b>" + eur(totalPole) + "</b> HT" + (CMP.partial ? " à date" : ""));
+  p("sv-impayes", "<span class='crit'>" + eur(s30) + "</span> au-delà de 30 j · " + n30 + " factures");
+  p("sv-b2b", "<b>" + eur(cur.rec) + "</b> récurrent · " + relance + "+" + churn + " à relancer");
+  p("sv-shop", "<b>" + eur(cur.sqCa) + "</b> · " + cur.sqTk.toLocaleString("fr-FR") +
+    " passages · " + eur(panier, 2));
+  p("sv-poisso", (DATA.poisso || []).filter((x) => x.statut !== "fait").length + " chantiers en cours");
+  p("sv-donnees", "Axonaut : " + esc(AXO_LABEL));
+  const modif = OBJ_SPEC.filter((x) => OBJ[x.k] !== OBJ_DEF[x.k]).length;
+  p("sv-objectifs", modif ? modif + " modifié" + (modif > 1 ? "s" : "") : "valeurs livrées");
+}
+
 /* ------------------------------------------------------------- amorçage */
 function boot() {
   AX = DATA.ax.slice();
   CLIENTS = DATA.clients.slice();
   FACTURES = DATA.factures.slice();
   SQ = DATA.sq;
-  Object.assign(OBJ_DEF, { ateliers_mensuel: 0, evenements_mensuel: 0 }, DATA.objectifs);
+  Object.assign(OBJ_DEF, { evenements_mensuel: 0 }, DATA.objectifs);
   OBJ = Object.assign({}, OBJ_DEF);
   objLoad();
   renderObj();
@@ -1344,6 +1318,7 @@ function boot() {
   renderPeriodSelect();
   render();
   renderSources();
+  secInit();
   $("wrap").hidden = false;
 }
 
@@ -1448,11 +1423,11 @@ async function demarrerEnClair() {
       "ci-dessus</b> et tout se calculera dans votre navigateur. Le fichier " +
       "<code>data.json</code> est publié par le scénario Make ; s'il manque, c'est " +
       "qu'il n'a pas encore tourné.";
-    document.querySelectorAll("section").forEach((s, i) => { if (i > 1) s.hidden = true; });
+    document.querySelectorAll(".sec").forEach((s, i) => { if (i > 1) s.hidden = true; });
     document.querySelector(".periodbar").hidden = true;
     return;
   }
-  document.querySelectorAll("section").forEach((s) => { s.hidden = false; });
+  document.querySelectorAll(".sec").forEach((s) => { s.hidden = false; });
   const pb = document.querySelector(".periodbar");
   if (pb) pb.hidden = false;
   $("msg").className = "";
