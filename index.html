@@ -270,13 +270,8 @@ a{color:var(--roast)}
       <input type="file" id="file" accept=".csv,text/csv" hidden>
     </div>
     <div class="srcstate">
-      <table><tbody>
-        <tr><td><span class="dot-ok"></span>Axonaut</td><td id="s-axo">—</td></tr>
-        <tr><td><span class="dot-fix"></span>Square — coffeeshop</td><td id="s-sq">—</td></tr>
-      </tbody></table>
-      <p class="note" style="margin-top:10px">Les sources marquées en orange sont figées à la date
-      de génération de la page : elles ne peuvent pas se rafraîchir depuis un site statique.
-      Il faut regénérer la page pour les mettre à jour.</p>
+      <table><tbody id="srcrows"></tbody></table>
+      <p class="note" id="srcnote" style="margin-top:10px"></p>
     </div>
   </div>
   <div id="msg" role="status"></div></div>
@@ -708,7 +703,7 @@ function build() {
   const maxDay = AX.reduce((x, a) => Math.max(x, a[0]), 0);
   CACHE.asOf = maxDay;
   CACHE.asOfDate = dayToDate(maxDay);
-  /* dernier jour couvert par le figé Square : sert à prévenir quand l'export
+  /* dernier jour couvert par Square : sert à prévenir quand l'export
      Axonaut est plus récent que lui, plutôt que d'afficher un CA tronqué */
   CACHE.sqMax = SQ.reduce((x, a) => Math.max(x, a[0]), 0);
   /* premier jour couvert par chaque source : avant, il n'y a pas « zéro »,
@@ -929,8 +924,9 @@ function render() {
   $("hperiod").innerHTML = esc(pLabel(PKEY)) +
     (partial ? ' <span style="color:var(--mut);font-size:.62em;font-weight:500">en cours · ' +
       elapsed + (elapsed > 1 ? " jours" : " jour") + " sur " + span + "</span>" : "");
-  $("hmeta").innerHTML = "Axonaut : " + esc(AXO_LABEL) + "<br>Square, Shopify, plateformes : figés au " +
-    new Date(DATA.genere).toLocaleDateString("fr-FR");
+  $("hmeta").innerHTML = "Données publiées le " +
+    (DATA.genere ? new Date(DATA.genere).toLocaleDateString("fr-FR") : "?") +
+    "<br>Axonaut : " + esc(AXO_LABEL);
 
   /* Objectif d'une période ENTIÈRE : un mois vaut l'objectif mensuel tel quel,
      un trimestre en vaut trois, une semaine en vaut 7/30,44. Puis, si la période
@@ -989,10 +985,10 @@ function render() {
     : "Période complète : les comparaisons portent sur les périodes entières. ") +
     "Terrah Poissonnière n'a pas encore d'activité." +
     (Math.abs(cur.aju) > 1 ? " Ajustements comptables sur la période : " + eur(cur.aju) + "." : "") +
-    (sqShort > 0 ? ' <b style="color:var(--crit)">Attention : le figé Square s\'arrête au ' +
+    (sqShort > 0 ? ' <b style="color:var(--crit)">Attention : les données Square s\'arrêtent au ' +
       fmtD(CACHE.sqMax) + ", soit " + sqShort + (sqShort > 1 ? " jours" : " jour") +
       " de moins que l'export Axonaut. Le CA du coffeeshop de cette période est sous-estimé " +
-      "et sa comparaison n'est pas fiable — il faut regénérer la page.</b>" : "");
+      "et sa comparaison n'est pas fiable — relancez le scénario Make.</b>" : "");
 
   /* ---- B2B ---- */
   const CS = clientStats();
@@ -1192,11 +1188,37 @@ function render() {
 
 /* ---------------------------------------------------------------- sources */
 function renderSources() {
-  const d = CACHE.asOfDate;
-  $("s-axo").textContent = AXO_LABEL + " · " + AX.length.toLocaleString("fr-FR") + " lignes · dernière facture le " +
-    d.toLocaleDateString("fr-FR", { timeZone: "UTC" });
-  const g = new Date(DATA.genere).toLocaleDateString("fr-FR");
-  $("s-sq").textContent = "figé au " + g + " · " + SQ.length + " jours";
+  /* On n'annonce pas une fraîcheur, on la constate : chaque ligne montre le
+     dernier jour réellement présent dans les données. Si c'est vieux, c'est que
+     le rafraîchissement n'a pas tourné — et la page le dit au lieu de le taire. */
+  const jour = (n) => dayToDate(n).toLocaleDateString("fr-FR", { timeZone: "UTC" });
+  const gen = DATA.genere ? new Date(DATA.genere) : null;
+  const ageJours = gen ? Math.floor((Date.now() - gen.getTime()) / DAY) : null;
+  const vieux = ageJours !== null && ageJours > 8;
+
+  const ligne = (nom, frais, detail) =>
+    "<tr><td><span class='" + (frais ? "dot-ok" : "dot-fix") + "'></span>" + esc(nom) +
+    "</td><td>" + detail + "</td></tr>";
+
+  const axoFrais = AXO_LABEL.indexOf("importé") === 0 || !vieux;
+  $("srcrows").innerHTML =
+    ligne("Axonaut — factures", axoFrais,
+      esc(AXO_LABEL) + " · " + AX.length.toLocaleString("fr-FR") +
+      " lignes<br>dernière facture le " + jour(CACHE.asOf)) +
+    ligne("Square — coffeeshop", !vieux,
+      SQ.length + " jours<br>dernier jour couvert : " + jour(CACHE.sqMax)) +
+    ligne("Publication du fichier", !vieux,
+      (gen ? gen.toLocaleDateString("fr-FR") : "inconnue") +
+      (ageJours !== null ? "<br>il y a " + ageJours + " jour" + (ageJours > 1 ? "s" : "") : ""));
+
+  $("srcnote").innerHTML = vieux
+    ? "<b style='color:var(--crit)'>Le fichier de données date de " + ageJours + " jours.</b> " +
+      "Le scénario Make devrait le republier chaque lundi matin : s'il n'a pas tourné, " +
+      "vérifiez-le dans Make. En attendant, vous pouvez déposer un export Axonaut ci-contre " +
+      "pour travailler sur des chiffres à jour."
+    : "Ces dates sont lues dans les données elles-mêmes, pas annoncées à l'avance. " +
+      "Le scénario Make republie le fichier chaque lundi matin ; un dépôt manuel d'export " +
+      "Axonaut prend le pas sur lui, le temps de votre visite.";
 }
 
 function showMsg(txt, cls) {
@@ -1228,7 +1250,7 @@ function loadFile(f) {
       showMsg("Import réussi : " + res.ax.length.toLocaleString("fr-FR") + " lignes, " +
         res.clients.length + " clients, total " + eur(res.total) + " HT" +
         (res.skipped ? " — " + res.skipped + " ligne(s) ignorée(s), sans date exploitable." : ".") +
-        " Square, Shopify et les plateformes restent figés.", "ok");
+        " Le coffeeshop reste sur les données du dernier rafraîchissement.", "ok");
     } catch (err) {
       showMsg("Import impossible : " + err.message, "err");
     }
