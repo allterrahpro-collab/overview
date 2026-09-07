@@ -1248,6 +1248,11 @@ function loadFile(f) {
       const res = ingest(String(r.result));
       AX = res.ax; CLIENTS = res.clients; FACTURES = res.factures;
       AXO_LABEL = "importé (" + f.name + ")";
+      if (!DATA) DATA = { objectifs: {}, statique: {} };
+      document.querySelectorAll("section").forEach((s) => { s.hidden = false; });
+      const pb = document.querySelector(".periodbar");
+      if (pb) pb.hidden = false;
+      document.getElementById("wrap").hidden = false;
       build();
       renderPeriodSelect();
       renderObj();
@@ -1394,14 +1399,23 @@ async function demarrerEnClair() {
     if (!r.ok) throw new Error("HTTP " + r.status);
     DATA = adopterBrut(await r.json());
   } catch (e) {
+    /* Pas de data.json : la page reste utilisable par dépôt manuel d'un export.
+       On le dit gros et en haut, plutôt que dans une tuile qu'on ne lit pas. */
     document.getElementById("wrap").hidden = false;
-    document.getElementById("tiles").innerHTML =
-      '<article class="tile"><h3>Données indisponibles</h3><p class="note">' +
-      "Le fichier data.json n'a pas pu être chargé (" + esc(e.message) + "). " +
-      "Vérifiez que le scénario Make a bien tourné. Vous pouvez aussi déposer " +
-      "un export Axonaut ci-dessus pour travailler sans lui.</p></article>";
+    $("msg").className = "err";
+    $("msg").innerHTML = "<b>Les chiffres ne sont pas encore publiés</b> (" + esc(e.message) +
+      "). La page fonctionne quand même : <b>déposez votre export Axonaut dans la zone " +
+      "ci-dessus</b> et tout se calculera dans votre navigateur. Le fichier " +
+      "<code>data.json</code> est publié par le scénario Make ; s'il manque, c'est " +
+      "qu'il n'a pas encore tourné.";
+    document.querySelectorAll("section").forEach((s, i) => { if (i > 1) s.hidden = true; });
+    document.querySelector(".periodbar").hidden = true;
     return;
   }
+  document.querySelectorAll("section").forEach((s) => { s.hidden = false; });
+  const pb = document.querySelector(".periodbar");
+  if (pb) pb.hidden = false;
+  $("msg").className = "";
   boot();
 }
 
