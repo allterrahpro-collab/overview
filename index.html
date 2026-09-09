@@ -442,6 +442,11 @@ a{color:var(--roast)}
 const $ = (id) => document.getElementById(id);
 const EPOCH = Date.UTC(2025, 0, 1);
 const DAY = 86400000;
+/* État de paiement d'une facture : un numéro de jour quand la date est connue,
+   sinon l'un de ces deux codes. PAYE_SANS_DATE existe parce qu'Axonaut sait
+   dire qu'une facture est réglée sans qu'on sache quand. */
+const IMPAYE = -1;
+const PAYE_SANS_DATE = -2;
 const NB = " ";
 const MOISFR = ["jan","fév","mars","avr","mai","juin","juil","août","sept","oct","nov","déc"];
 
@@ -697,7 +702,11 @@ function clientStats() {
     if (!inv.has(f)) inv.set(f, { ht: 0, d: a[0], c: c, paid: a[4] });
     const o = inv.get(f);
     o.ht += a[2] / 100;
+    /* Trois états possibles pour le paiement : une date, PAYE_SANS_DATE, ou
+       IMPAYE. Une date connue l'emporte sur tout ; à défaut, savoir que la
+       facture est réglée vaut mieux que de la laisser en impayé. */
     if (a[4] >= 0) o.paid = a[4];
+    else if (a[4] === PAYE_SANS_DATE && o.paid === IMPAYE) o.paid = PAYE_SANS_DATE;
   }
   return { last, first, dates, inv };
 }
@@ -1023,7 +1032,7 @@ function render() {
   const buck = [["0-30j", 0, 0], ["31-60j", 0, 0], ["61-90j", 0, 0], ["91-180j", 0, 0], [">180j", 0, 0]];
   const unpaid = [];
   CS.inv.forEach((o) => {
-    if (o.paid >= 0 || o.ht <= 0) return;
+    if (o.paid !== IMPAYE || o.ht <= 0) return;
     const age = asOf - o.d;
     const b = age <= 30 ? 0 : age <= 60 ? 1 : age <= 90 ? 2 : age <= 180 ? 3 : 4;
     buck[b][1]++; buck[b][2] += o.ht;
@@ -1272,6 +1281,22 @@ function adopterBrut(brut) {
     .filter((l) => !vues.has(String(l.f)))
     .concat(frais);
 
+  /* Le lot frais ne suffit pas pour les impayés. Axonaut n'a pas de filtre sur
+     la date de modification : demander les factures « modifiées depuis X » rend
+     en réalité celles *datées* d'après X. Une vieille facture enfin réglée ne
+     repasse donc jamais dans le lot frais, et resterait impayée pour toujours.
+     Le scénario rapporte pour cela la liste des factures encore impayées, sans
+     limite de date : elle fait autorité, dans les deux sens. */
+  const impayes = Array.isArray(brut.impayes)
+    ? new Set(brut.impayes.map((o) => String(o && typeof o === "object" ? o.f : o)))
+    : null;
+  const etatPaiement = (l, f) => {
+    const d = jour(l.pay);
+    if (!impayes) return d;
+    if (impayes.has(f)) return IMPAYE;
+    return d >= 0 ? d : PAYE_SANS_DATE;
+  };
+
   for (const l of lignes) {
     if (!l.d) continue;
     const c = (l.c || "").trim();
@@ -1292,7 +1317,7 @@ function adopterBrut(brut) {
       inconnus.set(l.p, e);
     }
     ax.push([jour(l.d), ci.get(c), Math.round((+l.ht || 0) * 100),
-      code, jour(l.pay), fi.get(f)]);
+      code, etatPaiement(l, f), fi.get(f)]);
   }
   /* Square arrive sous deux formes, et les deux cohabitent :
        - `square`      l'historique déjà agrégé, {jour: [CA net HT, tickets]}
