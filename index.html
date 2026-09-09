@@ -301,7 +301,7 @@ a{color:var(--roast)}
       <thead><tr><th>Ancienneté</th><th class="n">Factures</th><th class="n">Montant HT</th></tr></thead>
       <tbody id="impbuck"></tbody></table></div>
     <div class="tbl"><table>
-      <thead><tr><th>Plus gros impayés &gt; 30 j</th><th class="n">HT</th><th class="n">Âge</th><th class="n">Facture</th></tr></thead>
+      <thead><tr><th>À relancer, par client (&gt; 30 j)</th><th class="n">HT dû</th><th class="n">Factures</th><th class="n">Plus ancienne</th></tr></thead>
       <tbody id="imptop"></tbody></table></div>
   </div></div>
 </details>
@@ -1050,10 +1050,20 @@ function render() {
     "</td><td class='n'>" + eur(b[2]) + "</td></tr>").join("") +
     "<tr><td><b>Total</b></td><td class='n'><b>" + buck.reduce((s, b) => s + b[1], 0) +
     "</b></td><td class='n'><b>" + eur(buck.reduce((s, b) => s + b[2], 0)) + "</b></td></tr>";
-  unpaid.sort((a, b) => b.ht - a.ht);
-  $("imptop").innerHTML = unpaid.slice(0, 12).map((o) => "<tr><td class='cl'>" + esc(CLIENTS[o.c]) +
-    "</td><td class='n'>" + eur(o.ht) + "</td><td class='n'><span class='pill " + (o.age > 180 ? "crit" : "warn") +
-    "'>" + o.age + NB + "j</span></td><td class='n'>" +
+  /* Regroupé par client : une relance se passe au téléphone avec quelqu'un, pas
+     avec une facture. On additionne donc ce qu'il doit, et on retient sa plus
+     vieille facture — c'est elle qui donne le ton de l'appel. */
+  const parClient = new Map();
+  for (const o of unpaid) {
+    const e = parClient.get(o.c) || { c: o.c, ht: 0, n: 0, age: 0, d: o.d };
+    e.ht += o.ht; e.n++;
+    if (o.age > e.age) { e.age = o.age; e.d = o.d; }
+    parClient.set(o.c, e);
+  }
+  const relances = [...parClient.values()].sort((a, b) => b.ht - a.ht);
+  $("imptop").innerHTML = relances.slice(0, 12).map((o) => "<tr><td class='cl'>" + esc(CLIENTS[o.c]) +
+    "</td><td class='n'>" + eur(o.ht) + "</td><td class='n'>" + o.n +
+    "</td><td class='n'><span class='pill " + (o.age > 180 ? "crit" : "warn") + "'>" + o.age + NB + "j</span> " +
     dayToDate(o.d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "UTC" }) +
     "</td></tr>").join("") || "<tr><td colspan='4' class='empty'>Aucun impayé de plus de 30 jours.</td></tr>";
 
