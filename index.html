@@ -104,6 +104,29 @@ body{background:var(--ground); color:var(--ink);
 #msg{font-size:13px; padding:10px 14px; border-radius:4px; display:none}
 #msg.ok{display:block; background:var(--green-soft); color:var(--green); border-left:3px solid var(--green)}
 #msg.err{display:block; background:var(--crit-soft); color:var(--crit); border-left:3px solid var(--crit)}
+/* ---- hypothèses partagées : lire, essayer, enregistrer ---- */
+.hypbar{background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--green);
+  border-radius:0 4px 4px 0; padding:11px 14px; display:flex; flex-direction:column; gap:8px; font-size:13px}
+.hypbar.essai{border-left-color:var(--warn); background:var(--warn-soft)}
+.hypetat{margin:0; color:var(--ink-2)}
+.hypetat b{color:var(--ink)}
+.hypbar.essai .hypetat b{color:var(--warn)}
+.hypactions{display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px}
+.hypactions label{font-size:12.5px; color:var(--mut)}
+.hypactions input{font:inherit; font-size:13px; padding:5px 8px; border:1px solid var(--line-2); border-radius:3px;
+  background:var(--ground); color:var(--ink); width:11em; max-width:100%}
+.hypactions input:focus-visible{outline:2px solid var(--roast); outline-offset:1px}
+button.hypsave{font:inherit; font-size:12.5px; font-weight:600; padding:6px 13px; border-radius:3px; cursor:pointer;
+  background:var(--ink); color:var(--ground); border:1px solid var(--ink)}
+button.hypsave:disabled{opacity:.4; cursor:default}
+button.hypsave:focus-visible{outline:2px solid var(--roast); outline-offset:2px}
+.hypmsg{margin:0; font-size:12.5px; color:var(--mut)}
+.hypmsg:empty{display:none}
+.hypmsg.ok{color:var(--green)} .hypmsg.err{color:var(--crit); font-weight:500}
+.hyphisto{font-size:12.5px; color:var(--mut)}
+.hyphisto summary{cursor:pointer; color:var(--ink-2)}
+.hyphisto ol{margin:6px 0 0; padding-left:20px}
+.hyphisto li{margin-bottom:3px}
 
 /* ---- selecteur de periode ---- */
 .periodbar{margin:10px 0; display:flex; flex-wrap:wrap; gap:14px; align-items:center;
@@ -350,6 +373,26 @@ a{color:var(--roast)}
 .pm .note p:last-child{margin:0}
 .pm footer{margin-top:28px; color:var(--attenue); font-size:12px; max-width:84ch}
 .pm code{font:400 12px/1 "IBM Plex Mono",monospace; background:var(--sol); padding:1px 4px; border-radius:2px}
+.pm .hypbar{margin:0 0 18px}
+.pm .grille > *{min-width:0}
+.pm tbody td{white-space:nowrap}
+.pm tbody td:first-child, .pm td.motif{white-space:normal}
+.pm .pastille.enc{white-space:nowrap}   /* sans cela, un tableau large élargit toute la colonne sur mobile */
+.pm .hypactions button.linkbtn{padding:0; border:none; background:none; color:var(--roast); text-decoration:underline; font-size:12.5px}
+.pm .hypactions button.hypsave{background:var(--ink); color:var(--ground); border-color:var(--ink); font-weight:600; font-size:12.5px; padding:7px 13px}
+.pm .mois button.partiel{border-style:dashed; font-style:italic}
+.pm .mois button.partiel[aria-pressed="true"]{border-style:dashed}
+.pm .jauge .tick.projete{background:var(--laiton)}
+.pm .jauge .tick-txt.projete{font-style:italic; color:var(--laiton)}
+.pm .pastille.enc{background:var(--laiton-clair); color:var(--laiton); margin-left:6px}
+.pm tr.partiel td{color:var(--attenue); font-style:italic}
+.pm th button.tri{background:none; border:none; padding:0; margin:0; border-radius:0; font:inherit; letter-spacing:inherit;
+  text-transform:inherit; color:inherit; cursor:pointer; text-align:inherit; white-space:nowrap}
+.pm th button.tri:hover{color:var(--encre)}
+.pm th button.tri::after{content:"↕"; margin-left:4px; opacity:.35}
+.pm th[aria-sort="ascending"] button.tri, .pm th[aria-sort="descending"] button.tri{color:var(--encre)}
+.pm th[aria-sort="ascending"] button.tri::after{content:"▲"; opacity:1; color:var(--laiton)}
+.pm th[aria-sort="descending"] button.tri::after{content:"▼"; opacity:1; color:var(--laiton)}
 </style>
 
 </head>
@@ -379,9 +422,19 @@ a{color:var(--roast)}
 
 <details class="sec" id="sec-objectifs">
   <summary class="shead"><h2>Objectifs</h2>
-    <span class="sub">saisis à la main · conservés dans ce navigateur</span><span class="secval" id="sv-objectifs"></span></summary>
+    <span class="sub">saisis à la main · partagés par hypotheses.json</span><span class="secval" id="sv-objectifs"></span></summary>
   <div class="secbody">
   <div class="objgrid" id="objgrid"></div>
+  <div class="hypbar" id="obj-hyp">
+    <p class="hypetat" id="obj-etat" role="status"></p>
+    <div class="hypactions">
+      <label for="obj-auteur">Votre prénom</label>
+      <input type="text" id="obj-auteur" maxlength="40" autocomplete="off" placeholder="qui enregistre ?">
+      <button type="button" class="hypsave" id="obj-save" disabled>Enregistrer les objectifs</button>
+      <button type="button" class="linkbtn" id="obj-annuler" hidden>Annuler les essais</button>
+    </div>
+    <p class="hypmsg" id="obj-msg" role="alert"></p>
+  </div>
   <p class="sublabel" id="objnote"></p></div>
 </details>
 
@@ -556,7 +609,20 @@ a{color:var(--roast)}
   <summary class="shead"><h2>Point mort du coffeeshop</h2><span class="sub">simulateur : mix, salaires, charges, prix d'achat</span><span class="secval" id="sv-pointmort"></span></summary>
   <div class="secbody">
   <div class="pm">
-<p class="sous" style="margin:0 0 14px">Le modèle du BP recalé sur le réel : coût matière reconstruit recette par recette, équipe et charges en dur, prix d'achat pilotables. <button id="p-reset" type="button" style="margin-left:6px">Revenir aux valeurs observées</button></p>
+<p class="sous" style="margin:0 0 14px">Le modèle du BP recalé sur le réel : coût matière reconstruit recette par recette, équipe et charges en dur, prix d'achat pilotables.</p>
+<div class="hypbar" id="p-hyp">
+  <p class="hypetat" id="p-hyp-etat" role="status">Lecture de hypotheses.json…</p>
+  <div class="hypactions">
+    <label for="p-auteur">Votre prénom</label>
+    <input type="text" id="p-auteur" maxlength="40" autocomplete="off" placeholder="qui enregistre ?">
+    <button type="button" class="hypsave" id="p-save" disabled>Enregistrer les hypothèses</button>
+    <button type="button" class="linkbtn" id="p-annuler" hidden>Annuler les essais</button>
+    <button type="button" class="linkbtn" id="p-reset">Repartir des valeurs observées</button>
+  </div>
+  <p class="hypmsg" id="p-hyp-msg" role="alert"></p>
+  <p class="hypmsg">Enregistrés : équipe, provision, charges fixes, coût supposé, commission et prix d'achat. Le mois de référence et le curseur de CA servent à explorer : ils ne s'enregistrent pas.</p>
+  <details class="hyphisto" id="p-histo" hidden><summary>Qui a modifié quoi, et quand</summary><ol id="p-histo-liste"></ol></details>
+</div>
 <div class="grille">
   <div>
     <div class="onglets" role="tablist" aria-label="Hypothèses">
@@ -638,7 +704,8 @@ a{color:var(--roast)}
       <p class="verdict" id="verdict"></p>
       <p class="verdict-note" id="verdict-note"></p>
       <div class="jauge" id="jauge"></div>
-      <p class="jauge-legende">Le trait cuivré marque le CA qui annule l'EBITDA. Les repères gris situent votre activité réelle.</p>
+      <p class="jauge-legende">Le trait cuivré marque le CA qui annule l'EBITDA. Les repères gris situent votre activité réelle ; en italique, le mois en cours projeté.</p>
+      <div class="note" id="p-encours" hidden></div>
     </div>
 
     <div class="mesures">
@@ -691,7 +758,7 @@ a{color:var(--roast)}
         <h2>Marge par produit, d'après les recettes</h2>
         <div class="tbl-enveloppe">
           <table>
-            <thead><tr><th>Produit</th><th>Vendus</th><th>Coût/unité</th><th>Coût total</th><th>CA août</th><th>Marge brute</th></tr></thead>
+            <thead><tr><th>Produit</th><th>Vendus</th><th>Coût/unité</th><th>Coût total</th><th>CA du mois</th><th>Marge €</th><th>Taux de marge</th></tr></thead>
             <tbody id="marges"></tbody>
           </table>
         </div>
@@ -705,7 +772,7 @@ a{color:var(--roast)}
         <p class="sous" id="atc-intro" style="margin-bottom:12px"></p>
         <div class="tbl-enveloppe">
           <table>
-            <thead><tr><th>Produit</th><th>Vendus</th><th>CA août</th><th>Part</th><th>Où trouver le coût</th></tr></thead>
+            <thead><tr><th>Produit</th><th>Vendus</th><th>CA du mois</th><th>Part</th><th>Où trouver le coût</th></tr></thead>
             <tbody id="a-chiffrer"></tbody>
           </table>
         </div>
@@ -716,18 +783,23 @@ a{color:var(--roast)}
       <div class="bloc">
         <h2>Marge brute mois par mois</h2>
         <p class="sous" style="margin-bottom:12px">Chaque mois est calculé sur ce qui a réellement été vendu ce mois-là. La couverture indique la part du CA dont la recette est connue.</p>
-        <table>
-          <thead><tr><th>Mois</th><th>CA HT</th><th>Couverture</th><th>Coût matière</th><th>Marge brute</th></tr></thead>
-          <tbody id="marge-mois"></tbody>
-        </table>
+        <div class="tbl-enveloppe" style="max-height:none">
+          <table>
+            <thead><tr><th>Mois</th><th>CA HT</th><th>Couverture</th><th>Coût matière</th><th>Marge brute</th></tr></thead>
+            <tbody id="marge-mois"></tbody>
+          </table>
+        </div>
+        <p class="aide" id="marge-mois-note" style="margin-top:10px"></p>
       </div>
 
       <div class="bloc">
         <h2>Ce que donnent vos différents niveaux d'activité</h2>
-        <table>
-          <thead><tr><th>Niveau de CA</th><th>CA HT</th><th>Marge brute</th><th>EBITDA</th><th>Écart au point mort</th></tr></thead>
-          <tbody id="scenarios"></tbody>
-        </table>
+        <div class="tbl-enveloppe" style="max-height:none">
+          <table>
+            <thead><tr><th>Niveau de CA</th><th>CA HT</th><th>Marge brute</th><th>EBITDA</th><th>Écart au point mort</th></tr></thead>
+            <tbody id="scenarios"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -750,6 +822,7 @@ a{color:var(--roast)}
   Superbrut d'août 2026 — hors Dan et Julien, rattachés à la structure. Énergie relevée sur les factures EDF d'août (203,45 + 12,70 €).
   Ventes et quantités Square d'août 2026, nettes de TVA, remises et offerts. Coûts unitaires issus de la feuille « Food Recipe Cost », colonne sur place.
   Le modèle suppose le mix de vente constant : faire varier le CA fait varier les quantités dans les mêmes proportions.
+  <span id="p-pied-encours"></span>
 </footer>
   </div>
   </div>
@@ -780,43 +853,132 @@ let GRAN = "M";
 let PKEY = null;
 let CACHE = {};
 
+/* ------------------------------------------------- hypothèses partagées
+   hypotheses.json vit dans le dépôt, à côté de la page. Il porte, pour tout le
+   monde, les hypothèses du point mort et les objectifs. La page le lit au
+   chargement et ne l'écrit jamais elle-même : « Enregistrer » l'envoie au
+   webhook Make (scénario 7341094), qui fait le commit dans GitHub, écrit une
+   ligne dans le journal Google Sheet et répond. Rien n'est gardé dans le
+   navigateur : tant qu'on n'enregistre pas, une saisie n'est qu'un essai.
+   Le troisième bloc de script, le simulateur, s'en sert aussi. */
+const HYP_URL = "hypotheses.json";
+const HYP_WEBHOOK = "https://hook.eu1.make.com/a9pd4ykfgpgm1vy5ydqawgbuvonxgi3e";
+const HYP_HISTO = 12;   /* enregistrements gardés dans le fichier, le Sheet a tout */
+const PARTAGE = {
+  doc: null,            /* dernier état connu du fichier : lu, ou enregistré d'ici */
+  erreur: null,
+  auteur: "",           /* le prénom saisi, le temps de la visite seulement */
+  baseSimulateur: null, /* fournie par le simulateur : ses hypothèses enregistrées */
+  ecouteurs: [],
+  surChangement(f) { this.ecouteurs.push(f); },
+  annoncer() {
+    for (const f of this.ecouteurs) { try { f(this.doc); } catch (e) { console.error(e); } }
+  },
+};
+PARTAGE.pret = (async () => {
+  try {
+    /* Anti-cache : paramètre unique et no-store. Le CDN de GitHub Pages peut
+       malgré tout servir une version vieille de dix minutes au plus. */
+    const r = await fetch(HYP_URL + "?t=" + Date.now(), { cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const d = await r.json();
+    if (!d || typeof d !== "object" || Array.isArray(d)) throw new Error("contenu illisible");
+    PARTAGE.doc = d;
+  } catch (e) {
+    PARTAGE.doc = null;
+    PARTAGE.erreur = (e && e.message) || String(e);
+  }
+  return PARTAGE.doc;
+})();
+
+/* « le 10/09/2026 à 11:02 », à partir de la date ISO écrite dans le fichier. */
+function hypQuand(iso) {
+  const d = new Date(iso);
+  if (!iso || isNaN(d)) return "à une date inconnue";
+  return "le " + d.toLocaleDateString("fr-FR") + " à " +
+    d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
+/* Qui, quand, quoi : la phrase d'état commune aux deux barres. */
+function hypSignature(doc) {
+  if (!doc) return "";
+  return "<b>" + esc(doc.auteur || "?") + "</b>, " + esc(hypQuand(doc.maj)) +
+    (doc.resume ? " — " + esc(doc.resume) : "") + ".";
+}
+/* Le fichier complet à envoyer : on remplace une partie (simulateur ou
+   objectifs) et on garde l'autre telle qu'elle est enregistrée, pour ne jamais
+   enregistrer par ricochet les essais de l'autre section. */
+function hypDocument(partie, auteur, resume) {
+  const prec = PARTAGE.doc || {};
+  const maj = new Date().toISOString();
+  const sim = partie.simulateur || (PARTAGE.baseSimulateur ? PARTAGE.baseSimulateur() : {});
+  const objectifs = partie.objectifs || prec.objectifs || {};
+  /* Un fichier écrit avant l'historique compte pour une entrée. */
+  const avant = Array.isArray(prec.historique) ? prec.historique
+    : prec.maj ? [{ maj: prec.maj, auteur: prec.auteur || "?", resume: prec.resume || "" }] : [];
+  const histo = [{ maj, auteur, resume }].concat(avant).slice(0, HYP_HISTO);
+  return Object.assign({ maj, auteur, resume }, sim, { objectifs, historique: histo });
+}
+/* POST au webhook. Corps en application/x-www-form-urlencoded : c'est une
+   requête « simple » pour le navigateur, sans pré-vol CORS. Make n'y voit que
+   trois champs : auteur, resume et json (le fichier, en texte). */
+async function hypEnregistrer(auteur, resume, doc) {
+  const json = JSON.stringify(doc);
+  let r;
+  try {
+    r = await fetch(HYP_WEBHOOK, { method: "POST", body: new URLSearchParams({ auteur, resume, json }) });
+  } catch (e) {
+    throw new Error("le webhook Make est injoignable (" + ((e && e.message) || e) + ")");
+  }
+  const texte = await r.text();
+  let rep = null;
+  try { rep = JSON.parse(texte); }
+  catch (e) { rep = /"ok"\s*:\s*true/.test(texte) ? { ok: true } : null; }
+  if (!r.ok || !rep || rep.ok !== true)
+    throw new Error("Make n'a pas confirmé l'enregistrement (HTTP " + r.status +
+      (texte ? ", « " + texte.slice(0, 80) + " »" : "") + ")");
+  PARTAGE.doc = JSON.parse(json);
+  PARTAGE.erreur = null;
+  PARTAGE.annoncer();
+  return rep;
+}
+const HYP_DELAI = "Les autres le verront d'ici dix minutes au plus : c'est le délai du cache de " +
+  "GitHub Pages. Recharger la page avant peut encore montrer l'ancienne version.";
+
 /* ------------------------------------------------------------- objectifs
-   Les objectifs sont saisis à la main et gardés dans le navigateur : la page
-   est servie en statique, elle ne peut rien écrire côté serveur. Ils sont donc
-   propres à ce navigateur et à cette machine — le dire plutôt que le laisser
-   deviner. Les valeurs livrées servent de repli. */
+   Trois couches : les valeurs livrées par data.json (le socle), recouvertes
+   par celles enregistrées dans hypotheses.json, recouvertes à l'écran par les
+   essais du moment. Un essai n'existe que dans cet onglet, le temps de la
+   visite, jusqu'à ce qu'on l'enregistre pour tout le monde. */
 const OBJ_SPEC = [
   { k: "b2b_recurrent_mensuel", lbl: "B2B récurrent", per: "par mois" },
   { k: "oberkampf_mensuel", lbl: "Coffeeshop Oberkampf", per: "par mois" },
   { k: "evenements_mensuel", lbl: "Événements", per: "par mois" },
   { k: "b2b_vente_annuel", lbl: "B2B vente", per: "par an" },
 ];
-const OBJ_KEY = "terrah.objectifs.v1";
 const OBJ_DEF = { evenements_mensuel: 0 };
+let OBJ_SAUVE = Object.assign({}, OBJ_DEF);
 let OBJ = Object.assign({}, OBJ_DEF);
-let OBJ_STORE_OK = true;
+let OBJ_PRET = false;
 
-function objLoad() {
-  try {
-    const raw = localStorage.getItem(OBJ_KEY);
-    if (!raw) return;
-    const o = JSON.parse(raw);
+function objDepuis(doc) {
+  const o = Object.assign({}, OBJ_DEF);
+  const src = doc && doc.objectifs;
+  if (src && typeof src === "object")
     for (const s of OBJ_SPEC)
-      if (typeof o[s.k] === "number" && isFinite(o[s.k]) && o[s.k] >= 0) OBJ[s.k] = o[s.k];
-  } catch (e) { OBJ_STORE_OK = false; }
+      if (typeof src[s.k] === "number" && isFinite(src[s.k]) && src[s.k] >= 0) o[s.k] = src[s.k];
+  return o;
 }
-function objSave() {
-  try { localStorage.setItem(OBJ_KEY, JSON.stringify(OBJ)); }
-  catch (e) { OBJ_STORE_OK = false; renderObj(); }
-}
-function objReset() {
-  OBJ = Object.assign({}, OBJ_DEF);
-  try { localStorage.removeItem(OBJ_KEY); } catch (e) { /* rien à faire */ }
+const objEssais = () => OBJ_SPEC.filter((s) => OBJ[s.k] !== OBJ_SAUVE[s.k]);
+const objResume = (essais) => essais.map((s) =>
+  s.lbl + " " + s.per + " " + eur(OBJ_SAUVE[s.k] || 0) + " → " + eur(OBJ[s.k] || 0)).join(" ; ");
+function objAnnuler() {
+  OBJ = Object.assign({}, OBJ_SAUVE);
+  $("obj-msg").textContent = ""; $("obj-msg").className = "hypmsg";
   renderObj(); render();
 }
 function renderObj() {
   $("objgrid").innerHTML = OBJ_SPEC.map((s) => {
-    const dirty = OBJ[s.k] !== OBJ_DEF[s.k];
+    const dirty = OBJ[s.k] !== OBJ_SAUVE[s.k];
     return '<div class="objcell' + (dirty ? " dirty" : "") + '"><label for="obj-' + s.k + '">' +
       esc(s.lbl) + '</label><span class="per">' + esc(s.per) + '</span>' +
       '<div class="objin"><input id="obj-' + s.k + '" type="number" min="0" step="500" ' +
@@ -828,23 +990,62 @@ function renderObj() {
     const commit = () => {
       const v = parseFloat(String(el.value).replace(",", "."));
       OBJ[s.k] = isFinite(v) && v >= 0 ? v : 0;
-      objSave(); renderObj(); render();
+      renderObj(); render();
     };
     el.addEventListener("change", commit);
     el.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); commit(); } });
   }
-  const modif = OBJ_SPEC.filter((s) => OBJ[s.k] !== OBJ_DEF[s.k]).length;
   $("objnote").innerHTML =
-    (OBJ_STORE_OK
-      ? "Ces valeurs sont enregistrées dans <b>ce navigateur uniquement</b> : elles suivent la personne, pas la page. " +
-        "Un collègue qui ouvre le lien verra les objectifs livrés tant qu'il n'a pas saisi les siens. "
-      : '<b style="color:var(--crit)">Le navigateur refuse d\'enregistrer (navigation privée ou stockage bloqué) : ' +
-        "vos saisies tiennent le temps de la visite puis disparaissent.</b> ") +
-    "Un objectif mensuel est proratisé automatiquement sur la période affichée. Laissé à 0, il n'affiche aucune jauge. " +
-    (modif ? '<button class="linkbtn" type="button" id="objreset">Revenir aux ' + modif +
-      " valeur" + (modif > 1 ? "s" : "") + " d'origine</button>" : "");
-  if ($("objreset")) $("objreset").addEventListener("click", objReset);
+    "Les objectifs sont lus dans <code>hypotheses.json</code> : tout le monde voit les mêmes. " +
+    "Une saisie reste un essai, visible dans cet onglet seulement, tant qu'elle n'est pas enregistrée. " +
+    "Un objectif mensuel est proratisé automatiquement sur la période affichée. Laissé à 0, il n'affiche aucune jauge.";
+  objBarre();
 }
+function objBarre() {
+  const essais = objEssais();
+  $("obj-hyp").classList.toggle("essai", essais.length > 0);
+  $("obj-etat").innerHTML = essais.length
+    ? "<b>" + essais.length + " essai" + (essais.length > 1 ? "s" : "") + " non enregistré" +
+      (essais.length > 1 ? "s" : "") + "</b> : " + esc(objResume(essais)) + "."
+    : PARTAGE.doc
+      ? "Objectifs partagés. Dernier enregistrement du fichier : " + hypSignature(PARTAGE.doc)
+      : "<b>hypotheses.json n'a pas pu être lu</b> (" + esc(PARTAGE.erreur || "?") +
+        ") : ce sont les objectifs livrés. Enregistrer recréera le fichier.";
+  if ($("obj-auteur").value !== PARTAGE.auteur) $("obj-auteur").value = PARTAGE.auteur;
+  $("obj-save").disabled = !essais.length || !PARTAGE.auteur.trim();
+  $("obj-save").title = !essais.length ? "Rien à enregistrer" : !PARTAGE.auteur.trim() ? "Indiquez votre prénom" : "";
+  $("obj-annuler").hidden = !essais.length;
+}
+$("obj-auteur").addEventListener("input", () => {
+  PARTAGE.auteur = $("obj-auteur").value;
+  document.dispatchEvent(new CustomEvent("hyp-auteur"));
+});
+document.addEventListener("hyp-auteur", () => { if (OBJ_PRET) objBarre(); });
+$("obj-annuler").addEventListener("click", objAnnuler);
+$("obj-save").addEventListener("click", async () => {
+  const essais = objEssais(), auteur = PARTAGE.auteur.trim();
+  if (!essais.length || !auteur) return;
+  const resume = "Objectifs : " + objResume(essais);
+  const obj = {};
+  for (const s of OBJ_SPEC) obj[s.k] = OBJ[s.k];
+  const msg = $("obj-msg"), btn = $("obj-save");
+  btn.disabled = true; msg.className = "hypmsg"; msg.textContent = "Envoi à Make…";
+  try {
+    const rep = await hypEnregistrer(auteur, resume, hypDocument({ objectifs: obj }, auteur, resume));
+    msg.className = "hypmsg ok";
+    msg.textContent = "Enregistré" + (/^[0-9a-f]{7,40}$/.test(rep.commit || "") ? " (commit " + rep.commit.slice(0, 7) + ")" : "") +
+      ". " + HYP_DELAI;
+  } catch (e) {
+    msg.className = "hypmsg err";
+    msg.textContent = "Rien n'a été enregistré : " + e.message + ". Vos essais restent à l'écran, vous pouvez réessayer.";
+  }
+  objBarre();
+});
+PARTAGE.surChangement((doc) => {
+  OBJ_SAUVE = objDepuis(doc);
+  if (!OBJ_PRET) return;
+  renderObj(); render();
+});
 
 /* ------------------------------------------------------------------ dates */
 const dayToDate = (n) => new Date(EPOCH + n * DAY);
@@ -1508,26 +1709,10 @@ $("next").addEventListener("click", () => {
 });
 
 /* --------------------------------------------------- sections dépliables
-   Tout est replié au départ. L'état est gardé par navigateur, comme les
-   objectifs : chacun retrouve les sections qu'il avait ouvertes. */
-const SEC_KEY = "terrah.sections.v1";
-
-function secLire() {
-  try { return JSON.parse(localStorage.getItem(SEC_KEY) || "{}"); } catch (e) { return {}; }
-}
-function secEcrire(o) {
-  try { localStorage.setItem(SEC_KEY, JSON.stringify(o)); } catch (e) { /* onglet privé */ }
-}
+   Tout est replié au départ, à chaque visite : la page ne garde rien dans le
+   navigateur, pas même les sections ouvertes. */
 function secInit() {
-  const etat = secLire();
-  document.querySelectorAll(".sec").forEach((d) => {
-    d.open = etat[d.id] === true;
-    d.addEventListener("toggle", () => {
-      const e = secLire();
-      e[d.id] = d.open;
-      secEcrire(e);
-    });
-  });
+  document.querySelectorAll(".sec").forEach((d) => { d.open = false; });
 }
 
 /* Une section repliée doit rester lisible : on met son chiffre clé dans l'en-tête. */
@@ -1541,8 +1726,10 @@ function secResume(cur, totalPole, actifs, relance, churn, s30, n30, panier) {
   p("sv-poisso", (DATA.poisso || []).filter((x) => x.statut !== "fait").length + " chantiers en cours");
   p("sv-donnees", "publiées le " + (DATA.genere
     ? new Date(DATA.genere).toLocaleDateString("fr-FR") : "?"));
-  const modif = OBJ_SPEC.filter((x) => OBJ[x.k] !== OBJ_DEF[x.k]).length;
-  p("sv-objectifs", modif ? modif + " modifié" + (modif > 1 ? "s" : "") : "valeurs livrées");
+  const essais = objEssais().length;
+  p("sv-objectifs", essais ? "<span class='crit'>" + essais + " essai" + (essais > 1 ? "s" : "") +
+    " non enregistré" + (essais > 1 ? "s" : "") + "</span>"
+    : PARTAGE.doc ? "partagés" : "valeurs livrées");
 }
 
 /* ------------------------------------------------------------- amorçage */
@@ -1552,8 +1739,9 @@ function boot() {
   FACTURES = DATA.factures.slice();
   SQ = DATA.sq;
   Object.assign(OBJ_DEF, { evenements_mensuel: 0 }, DATA.objectifs);
-  OBJ = Object.assign({}, OBJ_DEF);
-  objLoad();
+  OBJ_SAUVE = objDepuis(PARTAGE.doc);
+  OBJ = Object.assign({}, OBJ_SAUVE);
+  OBJ_PRET = true;
   renderObj();
   build();
   renderPeriodSelect();
@@ -1701,6 +1889,7 @@ async function demarrerEnClair() {
     const r = await fetch("data.json", { cache: "no-store" });
     if (!r.ok) throw new Error("HTTP " + r.status);
     DATA = adopterBrut(await r.json());
+    await PARTAGE.pret;   /* les objectifs enregistrés viennent de hypotheses.json */
   } catch (e) {
     /* Pas de data.json : la page reste utilisable par dépôt manuel d'un export.
        On le dit gros et en haut, plutôt que dans une tuile qu'on ne lit pas. */
@@ -1743,7 +1932,7 @@ demarrerEnClair();
      R    une recette : p = portions produites, i = [ingrédient ou recette, quantité]
      MAP  article de caisse → recettes, avec la part de chaque variante
      MOIS ce qui est passé en caisse, par mois : article → [quantité, ventes nettes HT] */
-  var REF = {"I":{"gaitania":{"n":"Café Gaitania","p":0.01289,"u":"g","s":"cost"},"guji":{"n":"Café Guji (filtre)","p":0.016,"u":"g","s":"cost"},"malawi":{"n":"Café Malawi (cold brew)","p":0.015,"u":"g","s":"cost"},"matcha":{"n":"Matcha","p":0.14,"u":"g","s":"cost"},"chai":{"n":"Chai","p":0.029,"u":"g","s":"cost"},"golden":{"n":"Mélange golden latte","p":0.0516,"u":"g","s":"cost"},"choco_poudre":{"n":"Chocolat en poudre","p":0.02252,"u":"g","s":"cost"},"sesame":{"n":"Pâte de sésame","p":0.05,"u":"g","s":"cost"},"sarrasin":{"n":"Sarrasin (sobacha)","p":0.00595,"u":"g","s":"cost"},"the_jasmin":{"n":"Thé jasmin","p":0.1376,"u":"portion","s":"cost"},"the_poire":{"n":"Thé poire","p":0.1024,"u":"portion","s":"cost"},"rooibos":{"n":"Rooibos","p":0.1156,"u":"portion","s":"cost"},"miel":{"n":"Miel","p":0.00936,"u":"g","s":"fflow","c":"4,68 € les 500 g"},"lait_vache":{"n":"Lait entier UHT","p":0.001142,"u":"g","s":"cost"},"lait_avoine":{"n":"Lait d'avoine (Oatly)","p":0.001187,"u":"g","s":"cost"},"lait_coco":{"n":"Lait de coco barista","p":0.00242,"u":"g","s":"cost"},"puree_mangue":{"n":"Purée de mangue","p":0.01045,"u":"g","s":"cost"},"kombucha_fra":{"n":"Kombucha framboise","p":1.79,"u":"canette","s":"fflow","c":"42,96 € les 24"},"kombucha_fig":{"n":"Kombucha figue","p":2.19,"u":"canette","s":"cost"},"pain_choc":{"n":"Pain au chocolat cru","p":0.387375,"u":"pièce","s":"fflow","c":"30,99 € les 80"},"croissant":{"n":"Croissant cru","p":0.4575,"u":"pièce","s":"fflow","c":"27,45 € les 60"},"cake_banana":{"n":"Banana bread (part)","p":1.54,"u":"part","s":"mandy","c":"12,32 € le cake de 8 parts"},"cake_citron":{"n":"Cake citron (part)","p":2.01375,"u":"part","s":"mandy","c":"16,11 € le cake de 8 parts"},"cake_chocogf":{"n":"Cake chocolat sans gluten (part)","p":2.5125,"u":"part","s":"mandy","c":"20,10 € le cake, 8 parts supposées"},"cookie":{"n":"Cookie chocolat fleur de sel","p":1.247222,"u":"pièce","s":"mandy","c":"22,45 € la boîte de 18"},"granola":{"n":"Granola maison","p":0.006596,"u":"g","s":"cost"},"mesclun":{"n":"Mesclun","p":0.00775,"u":"g","s":"fflow","c":"7,75 € le kg"},"roquette":{"n":"Roquette","p":0.00775,"u":"g","s":"est","c":"approchée par le mesclun"},"tomate_coeur":{"n":"Tomate cœur de bœuf","p":0.00514,"u":"g","s":"fflow","c":"5,14 € le kg"},"tomate_roma":{"n":"Tomate Roma","p":0.00502,"u":"g","s":"fflow","c":"5,02 € le kg"},"pasteque":{"n":"Pastèque","p":0.00139,"u":"g","s":"fflow","c":"1,39 € le kg"},"feta":{"n":"Féta","p":0.01327,"u":"g","s":"fflow","c":"13,27 € le kg"},"fenouil":{"n":"Fenouil","p":0.00288,"u":"g","s":"fflow","c":"2,88 € le kg"},"burrata":{"n":"Burrata","p":0.01285,"u":"g","s":"fflow","c":"12,85 € le kg, boule de 125 g"},"mozzarella":{"n":"Mozzarella fior di latte","p":0.00942,"u":"g","s":"fflow","c":"9,42 € le kg"},"granny":{"n":"Pomme Granny","p":0.0029,"u":"g","s":"fflow","c":"2,90 € le kg"},"saumon":{"n":"Saumon fumé","p":0.0214,"u":"g","s":"fflow","c":"21,40 € le kg"},"coppa":{"n":"Coppa tranchée","p":0.02216,"u":"g","s":"fflow","c":"11,08 € les 500 g"},"cream_cheese":{"n":"Cream cheese","p":0.009473,"u":"g","s":"fflow","c":"14,21 € les 1,5 kg"},"pesto":{"n":"Pesto basilic","p":0.01705,"u":"g","s":"fflow","c":"6,82 € les 400 g"},"avocat":{"n":"Avocat Hass","p":0.92,"u":"pièce","s":"fflow"},"citron":{"n":"Citron jaune","p":0.00237,"u":"g","s":"fflow","c":"2,37 € le kg"},"oignon_rouge":{"n":"Oignon rouge","p":0.00094,"u":"g","s":"fflow","c":"0,94 € le kg"},"sumac":{"n":"Sumac","p":0.01368,"u":"g","s":"fflow","c":"6,84 € les 500 g"},"huile_olive":{"n":"Huile d'olive","p":0.006096,"u":"g","s":"fflow","c":"27,89 € les 5 L"},"aneth":{"n":"Aneth","p":0.81,"u":"botte","s":"fflow"},"basilic":{"n":"Basilic","p":0.59,"u":"botte","s":"fflow"},"coulis_mangue":{"n":"Coulis de mangue","p":0.00901,"u":"g","s":"fflow","c":"9,01 € le kg"},"vinaigre":{"n":"Vinaigre d'alcool","p":0.001,"u":"g","s":"est"},"sel":{"n":"Sel / fleur de sel","p":0.002,"u":"g","s":"est"},"pain_tranche":{"n":"Pain de mie, la tranche","p":0.2,"u":"tranche","s":"est","c":"absent des factures fournies"},"bun":{"n":"Bun","p":0.8,"u":"pièce","s":"est","c":"absent des factures fournies"}},"R":{"espresso":{"n":"Espresso","p":1,"i":[["gaitania",9]]},"double_espresso":{"n":"Double espresso","p":1,"i":[["gaitania",18]]},"americano":{"n":"Americano","p":1,"i":[["gaitania",18]]},"noisette":{"n":"Noisette","p":1,"i":[["gaitania",9],["lait_vache",136]]},"cappuccino":{"n":"Cappuccino","p":1,"i":[["gaitania",9],["lait_avoine",115]]},"latte":{"n":"Latte","p":1,"i":[["gaitania",9],["lait_vache",213]]},"flat_white":{"n":"Flat white","p":1,"i":[["gaitania",18],["lait_vache",105]]},"filtre":{"n":"Filtre / batch brew","p":1,"i":[["guji",12]]},"cold_brew":{"n":"Cold brew","p":1,"i":[["malawi",11.8]]},"mango_matcha":{"n":"Mango coco matcha","p":1,"i":[["matcha",2],["lait_coco",150],["puree_mangue",35]]},"matcha_latte":{"n":"Matcha latte","p":1,"i":[["matcha",2],["lait_vache",190]]},"chai_latte":{"n":"Chai latte","p":1,"i":[["chai",13],["lait_avoine",190]]},"golden_latte":{"n":"Golden latte","p":1,"i":[["golden",6],["lait_vache",190]]},"chocolat_chaud":{"n":"Chocolat chaud","p":1,"i":[["choco_poudre",15],["lait_vache",200]]},"iced_tea":{"n":"Iced tea","p":6.666666667,"i":[["the_poire",4],["miel",40]]},"the_jasmin":{"n":"Thé","p":1,"i":[["the_jasmin",1]]},"granola_bowl":{"n":"Granola bowl","p":1,"i":[["granola",9.7]]},"kombucha_fra":{"n":"Kombucha framboise","p":1,"i":[["kombucha_fra",1]]},"kombucha_fig":{"n":"Kombucha figue","p":1,"i":[["kombucha_fig",1]]},"pain_choc":{"n":"Pain au chocolat","p":1,"i":[["pain_choc",1]]},"croissant":{"n":"Croissant","p":1,"i":[["croissant",1]]},"cake_banana":{"n":"Banana bread","p":1,"i":[["cake_banana",1]]},"cake_citron":{"n":"Cake citron","p":1,"i":[["cake_citron",1]]},"cake_chocogf":{"n":"Cake chocolat sans gluten","p":1,"i":[["cake_chocogf",1]]},"cookie":{"n":"Cookie","p":1,"i":[["cookie",1]]},"vinaigrette":{"n":"Vinaigrette mangue-miel","p":30.3,"i":[["coulis_mangue",300],["vinaigre",100],["miel",70],["huile_olive",130],["sel",6]]},"salade_pasteque":{"n":"Salade pastèque féta","p":1,"i":[["mesclun",60],["pasteque",150],["feta",60],["fenouil",40],["aneth",0.16666666666666666],["basilic",0.16666666666666666],["huile_olive",10],["vinaigrette",1]]},"salade_burrata":{"n":"Salade burrata","p":1,"i":[["mesclun",60],["tomate_coeur",120],["burrata",125],["granny",60],["aneth",0.16666666666666666],["huile_olive",10],["vinaigrette",1]]},"salade_mozza":{"n":"Salade tomates mozza","p":1,"i":[["mesclun",60],["tomate_coeur",150],["mozzarella",100],["basilic",0.16666666666666666],["huile_olive",10],["vinaigrette",1]]},"toast_saumon":{"n":"Toast saumon","p":1,"i":[["pain_tranche",2],["cream_cheese",60],["saumon",70],["citron",5],["aneth",0.125],["huile_olive",5],["sel",2]]},"toast_avocat":{"n":"Toast avocat","p":1,"i":[["pain_tranche",2],["cream_cheese",40],["avocat",1],["citron",5],["oignon_rouge",20],["sumac",2]]},"toast_saumon_avocat":{"n":"Salmon avocado toast","p":1,"i":[["pain_tranche",2],["cream_cheese",60],["saumon",70],["avocat",1],["citron",5],["aneth",0.125],["huile_olive",5]]},"bun_caprese":{"n":"Bun caprese","p":1,"i":[["bun",1],["pesto",20],["roquette",30],["coppa",40],["tomate_roma",60],["mozzarella",60],["basilic",0.1],["huile_olive",5]]},"babyccino":{"n":"Babyccino","p":1,"i":[["lait_vache",200]]}},"MAP":{"LATTE":[["latte",1]],"MATCHA LATTE":[["matcha_latte",1]],"CAPPUCCINO":[["cappuccino",1]],"FLAT WHITE":[["flat_white",1]],"MANGO COCO MATCHA":[["mango_matcha",1]],"AMERICANO":[["americano",1]],"COLD BREW":[["cold_brew",1]],"ICED TEA":[["iced_tea",1]],"CHAI LATTE":[["chai_latte",1]],"ESPRESSO":[["espresso",1]],"DOUBLE ESPRESSO":[["double_espresso",1]],"CHOCOLAT CHAUD":[["chocolat_chaud",1]],"FILTRE / BATCH BREW":[["filtre",1]],"V60":[["filtre",1]],"THÉ":[["the_jasmin",1]],"ALLONGÉ":[["espresso",1]],"CORTADO":[["flat_white",1]],"NOISETTE":[["noisette",1]],"GOLDEN LATTE":[["golden_latte",1]],"BABYCCINO":[["babyccino",1]],"GRANOLA BOWL":[["granola_bowl",1]],"EXTRA SHOT CAFE":[["espresso",1]],"ESPRESSO COMMERCANT":[["espresso",1]],"EXTRA CAFE":[["espresso",1]],"CAKE":[["cake_banana",0.55725],["cake_citron",0.25573],["cake_chocogf",0.18702]],"COOKIE":[["cookie",1]],"VIENNOISERIE":[["pain_choc",0.8169],["croissant",0.1831]],"KOMBUCHA":[["kombucha_fra",0.92],["kombucha_fig",0.08]],"KOMBUCHA FRAMBOISE":[["kombucha_fra",1]],"KOMBUCHA FIGUE":[["kombucha_fig",1]],"SALADE":[["salade_mozza",0.63492],["salade_pasteque",0.36508]],"AVOCADO TOASTS":[["toast_avocat",1]],"BUN CAPRESE":[["bun_caprese",1]],"SALMON TOAST":[["toast_saumon",1]],"SALMON TOASTS":[["toast_saumon",1]],"FORMULE SALE":[["toast_avocat",0.28421],["toast_saumon_avocat",0.2],["bun_caprese",0.17895],["salade_burrata",0.12632],["toast_saumon",0.11579],["salade_pasteque",0.09474]],"FORMULE TOAST":[["toast_avocat",0.44729],["toast_saumon",0.2963],["toast_saumon_avocat",0.25641]]},"MOIS":{"2026-03":{"LATTE":[814,4002.58],"CAPPUCCINO":[634,2843.51],"CAKE":[503,2004.98],"FLAT WHITE":[397,2206.83],"COOKIE":[392,1402.04],"MATCHA LATTE":[302,1865.35],"VIENNOISERIE":[267,540.09],"ESPRESSO":[251,576.4],"AMERICANO":[211,750.87],"DOUBLE ESPRESSO":[190,610.43],"ALLONGÉ":[190,439.79],"CHAI LATTE":[177,925.48],"FORMULE TOAST":[168,2729.43],"FILTRE / BATCH BREW":[167,726.51],"NOISETTE":[124,457.16],"CHOCOLAT CHAUD":[119,631.33],"MANGO COCO MATCHA":[118,757.35],"THÉ":[100,357.96],"EXTRA SHOT CAFE":[89,82.5],"TIRAMISU LATTE":[81,510.25],"UBE LATTE":[71,377.92],"ICED TEA":[63,268.56],"COLD BREW":[46,251.04],"GOLDEN LATTE":[39,206.38],"KOMBUCHA FRAMBOISE":[35,147.63],"KOMBUCHA FIGUE":[35,149.86],"GRANOLA BOWL":[33,188.34],"Gaitania":[31,301.86],"Foccaccia Basilicate":[23,195.49],"MONT BLANC":[22,135.45],"AVOCADO TOASTS":[20,227.43],"Palermo":[15,172.48],"WOREDA":[14,247.64],"EXTRA SHOT LAIT":[13,12.15],"LA VIE EN ROSE":[13,178.48],"SALMON TOAST":[12,139.69],"GEISHA PIVARAL":[11,182.86],"Simeti":[9,76.67],"VIN":[8,40.82],"Kunde":[5,90.04],"CIDRE":[5,25.0],"SAMBA":[5,13.27],"Terrah":[5,52.14],"BIERE 33CL":[4,20.0],"(sans nom)":[4,108.87],"Boisson + Foccaccia":[4,41.44],"CAPSULES":[2,9.48],"Boisson + Foccaccia + dessert":[1,11.95],"Halo":[1,19.0],"ESPRESSO TONIC":[1,3.64],"V60":[1,8.18]},"2026-04":{"LATTE":[780,3850.07],"CAPPUCCINO":[480,2118.14],"CAKE":[422,1667.6],"FLAT WHITE":[337,1946.97],"MATCHA LATTE":[319,1954.85],"COOKIE":[299,1074.96],"VIENNOISERIE":[293,588.67],"ESPRESSO":[287,662.38],"AMERICANO":[223,816.04],"ALLONGÉ":[150,343.64],"FORMULE TOAST":[148,2419.81],"DOUBLE ESPRESSO":[147,468.4],"CHAI LATTE":[139,713.1],"MANGO COCO MATCHA":[130,847.2],"FILTRE / BATCH BREW":[116,510.89],"THÉ":[93,325.58],"TIRAMISU LATTE":[91,536.56],"CHOCOLAT CHAUD":[86,459.75],"MONT BLANC":[73,436.15],"NOISETTE":[73,269.58],"COLD BREW":[71,384.91],"ICED TEA":[69,291.89],"KOMBUCHA FRAMBOISE":[52,231.76],"UBE LATTE":[51,255.29],"EXTRA SHOT CAFE":[45,42.23],"GRANOLA BOWL":[34,181.72],"GOLDEN LATTE":[29,155.26],"SALMON TOAST":[19,215.13],"KOMBUCHA FIGUE":[19,83.97],"Gaitania":[17,216.71],"AVOCADO TOASTS":[14,157.65],"WOREDA":[13,177.34],"EXTRA SHOT LAIT":[12,11.24],"GEISHA PIVARAL":[10,169.01],"SAMBA":[8,26.54],"Simeti":[8,105.39],"LA VIE EN ROSE":[7,90.05],"BABYCCINO":[7,19.22],"CAPSULES":[5,23.7],"(sans nom)":[5,109.33],"ESPRESSO TONIC":[4,15.16],"V60":[2,16.36],"SOBACHA":[1,4.54],"BIERE 33CL":[1,5.0],"SESAME LATTE":[1,5.69],"CIDRE":[1,5.0]},"2026-05":{"LATTE":[754,3718.52],"CAPPUCCINO":[436,1889.21],"CAKE":[332,1290.97],"COOKIE":[307,1089.39],"MATCHA LATTE":[274,1631.74],"FLAT WHITE":[274,1562.09],"VIENNOISERIE":[245,487.3],"ESPRESSO":[234,526.99],"AMERICANO":[219,784.92],"FORMULE TOAST":[173,2789.39],"ALLONGÉ":[155,351.41],"ICED TEA":[134,559.15],"DOUBLE ESPRESSO":[132,411.97],"MANGO COCO MATCHA":[125,786.27],"TIRAMISU LATTE":[122,743.94],"CHAI LATTE":[107,579.78],"FILTRE / BATCH BREW":[97,442.16],"COLD BREW":[91,490.17],"NOISETTE":[89,327.09],"EXTRA SHOT CAFE":[83,77.31],"MONT BLANC":[82,503.5],"THÉ":[73,248.75],"CHOCOLAT CHAUD":[71,380.47],"UBE LATTE":[56,296.37],"Gaitania":[35,289.36],"KOMBUCHA FRAMBOISE":[35,147.86],"GRANOLA BOWL":[35,198.22],"LA VIE EN ROSE":[29,423.68],"KOMBUCHA FIGUE":[29,105.68],"EXTRA SHOT LAIT":[21,19.39],"Simeti":[18,208.06],"GOLDEN LATTE":[15,66.13],"WOREDA":[14,236.11],"AVOCADO TOASTS":[13,150.51],"BABYCCINO":[9,21.95],"SALMON TOAST":[9,100.93],"(sans nom)":[6,51.31],"CAPSULES":[5,67.18],"SAMBA":[4,0.0],"CIDRE":[2,5.0],"JIMMA - DÉCA":[2,28.44],"GEISHA PIVARAL":[2,37.92],"SOBACHA":[2,4.54],"Palermo":[2,34.12],"V60":[1,8.18]},"2026-06":{"V60":[1,8.18],"ICED TEA":[220,972.32],"MANGO COCO MATCHA":[196,1323.98],"KOMBUCHA FRAMBOISE":[77,323.58],"CHAI LATTE":[83,426.38],"THÉ":[41,146.94],"Gaitania":[25,200.64],"NOISETTE":[64,217.72],"FLAT WHITE":[166,978.86],"COPPA DE BOEUF":[4,3.11],"ESPRESSO TONIC":[5,18.5],"SALMON TOAST":[8,90.94],"GEISHA PIVARAL":[1,18.96],"CIDRE":[19,90.0],"BABYCCINO":[2,5.46],"JIMMA - DÉCA":[1,14.22],"(sans nom)":[8,126.84],"EAU PLATE":[36,68.17],"GOLDEN LATTE":[18,82.75],"EAU PETILLANTE":[3,8.52],"BUN CAPRESE":[38,294.23],"SALADE":[33,366.5],"CORTADO":[7,32.23],"MONT BLANC":[64,402.12],"BIERE 33CL":[90,445.0],"CHOCOLAT CHAUD":[44,231.73],"EXTRA SHOT CAFE":[113,105.97],"AVOCADO TOASTS":[16,185.15],"ESPRESSO":[216,493.64],"ESP MAR":[135,1409.98],"TIRAMISU LATTE":[77,470.29],"COLD BREW":[142,787.01],"SAMBA":[8,53.08],"Simeti":[15,189.94],"LATTE":[876,4264.74],"WOREDA":[13,194.6],"GRANOLA BOWL":[31,153.22],"DOUBLE ESPRESSO":[139,444.69],"CAKE":[315,1226.34],"UBE LATTE":[40,193.44],"CAPPUCCINO":[279,1219.89],"AMERICANO":[232,838.75],"ALLONGÉ":[126,283.08],"LA VIE EN ROSE":[15,236.11],"COOKIE":[204,737.15],"EXTRA SHOT LAIT":[18,16.7],"VIENNOISERIE":[201,404.31],"MATCHA LATTE":[254,1593.34],"FORMULE TOAST":[139,2289.36],"KOMBUCHA FIGUE":[38,167.52],"FILTRE / BATCH BREW":[92,410.45]},"2026-07":{"ICED TEA":[177,748.42],"AVOCADO TOASTS":[61,708.83],"CORTADO":[33,137.39],"FORMULE SALE":[58,1055.15],"KOMBUCHA":[29,127.24],"GRANOLA BOWL":[35,172.69],"CHOCOLAT CHAUD":[41,216.23],"MANGO COCO MATCHA":[133,856.15],"EXTRA SHOT LAIT":[20,17.61],"SALMON TOAST":[44,506.41],"TIRAMISU LATTE":[74,472.75],"WOREDA":[21,345.12],"Gaitania":[16,213.29],"SAMBA":[6,0.0],"ALLONGÉ":[89,198.13],"(sans nom)":[2,53.56],"THÉ":[27,101.25],"BIERE 33CL":[2,10.0],"AMERICANO":[194,703.79],"CIDRE":[2,10.0],"SIMETI":[1,15.16],"CAPSULES":[2,42.66],"BUN CAPRESE":[48,398.71],"MONT BLANC":[69,458.23],"UBE LATTE":[34,172.82],"VIENNOISERIE":[224,455.87],"CAKE":[257,958.12],"MATCHA LATTE":[229,1376.09],"NOISETTE":[23,84.83],"CHAI LATTE":[61,307.67],"Simeti":[1,0.0],"ESPRESSO COMMERCANT":[3,2.85],"KOMBUCHA FIGUE":[16,69.35],"FILTRE / BATCH BREW":[38,176.48],"EXTRA SIROP":[18,7.09],"ESPRESSO":[196,452.73],"EXTRA SHOT CAFE":[81,72.89],"FORMULE TOAST":[74,1188.2],"COPPA DE BOEUF":[22,17.36],"DOUBLE ESPRESSO":[118,372.79],"COLD BREW":[156,830.18],"SALADE":[110,1219.69],"GOLDEN LATTE":[32,166.19],"CAPPUCCINO":[236,1038.31],"FLAT WHITE":[162,902.49],"LATTE":[723,3580.12],"COOKIE":[190,624.27],"KOMBUCHA FRAMBOISE":[25,110.87]},"2026-08":{"LATTE":[581,2817.25],"FORMULE SALE":[95,1690.52],"MATCHA LATTE":[201,1200.5],"CAPPUCCINO":[238,1089.35],"CAKE":[262,873.04],"FLAT WHITE":[159,840.29],"MANGO COCO MATCHA":[127,839.15],"AMERICANO":[215,778.86],"COLD BREW":[143,772.17],"SALADE":[63,695.42],"AVOCADO TOASTS":[52,592.71],"COOKIE":[183,587.59],"TIRAMISU LATTE":[82,536.14],"ICED TEA":[119,532.01],"MONT BLANC":[78,503.51],"CHAI LATTE":[84,456.98],"BUN CAPRESE":[54,450.87],"ESPRESSO":[167,383.02],"DOUBLE ESPRESSO":[94,305.92],"SALMON TOAST":[25,294.62],"CHOCOLAT CHAUD":[55,289.18],"VIENNOISERIE":[142,283.86],"PINK LATTE":[49,273.75],"UBE LATTE":[51,266.68],"SALMON TOASTS":[16,199.27],"SIMETI":[13,178.34],"FILTRE / BATCH BREW":[39,171.75],"GRANOLA BOWL":[37,160.73],"THÉ":[33,133.17],"ALLONGÉ":[54,126.0],"CORTADO":[27,113.08],"KOMBUCHA":[25,112.22],"CARNAVAL":[8,107.83],"WOREDA":[6,105.54],"NOISETTE":[22,81.26],"Oeuf à la coque":[16,62.62],"GOLDEN LATTE":[11,60.9],"OEUF À LA COQUE":[12,46.97],"SAMBA":[6,39.81],"EXTRA SHOT CAFE":[39,36.85],"Gaitania":[4,36.25],"CABALLERO":[2,30.33],"GAITANIA":[7,27.02],"CAPSULES":[1,21.33],"COPPA DE BOEUF":[25,19.66],"EXTRA SIROP":[46,17.8],"(sans nom)":[3,15.45],"EXTRA CAFE":[16,15.08],"ESPRESSO COMMERCANT":[13,12.87],"EXTRA OEUF":[8,12.62],"EXTRA SHOT LAIT":[12,11.32],"EXTRA Oeuf":[7,10.83],"CIDRE":[2,10.0],"BIERE 33CL":[2,10.0]}},"MOTIF":{"TIRAMISU LATTE":"recette à créer","MONT BLANC":"recette à créer","UBE LATTE":"recette à créer","PINK LATTE":"recette à créer","LA VIE EN ROSE":"recette à créer","ESP MAR":"recette à créer","ESPRESSO TONIC":"recette à créer","Palermo":"recette à créer","Foccaccia Basilicate":"recette à créer","Oeuf à la coque":"doublon de casse avec OEUF À LA COQUE","OEUF À LA COQUE":"recette à créer","EXTRA Oeuf":"doublon de casse avec EXTRA OEUF","EXTRA OEUF":"prix d'achat","Gaitania":"doublon de casse avec GAITANIA","Simeti":"doublon de casse avec SIMETI","(sans nom)":"article sans nom dans Square","EXTRA SIROP":"prix d'achat au dosage","EXTRA SHOT LAIT":"prix d'achat au dosage","CAPSULES":"prix d'achat","COPPA DE BOEUF":"prix d'achat","CIDRE":"prix d'achat","BIERE 33CL":"prix d'achat","EAU PLATE":"prix d'achat","EAU PETILLANTE":"prix d'achat","SIMETI":"café en grains : coût de revient torréfaction","CARNAVAL":"café en grains : coût de revient torréfaction","WOREDA":"café en grains : coût de revient torréfaction","SAMBA":"café en grains : coût de revient torréfaction","CABALLERO":"café en grains : coût de revient torréfaction","GAITANIA":"café en grains : coût de revient torréfaction","GEISHA PIVARAL":"café en grains : coût de revient torréfaction","JIMMA - DÉCA":"café en grains : coût de revient torréfaction","Kunde":"café en grains : coût de revient torréfaction"}};
+  var REF = {"I":{"gaitania":{"n":"Café Gaitania","p":0.01289,"u":"g","s":"cost"},"guji":{"n":"Café Guji (filtre)","p":0.016,"u":"g","s":"cost"},"malawi":{"n":"Café Malawi (cold brew)","p":0.015,"u":"g","s":"cost"},"matcha":{"n":"Matcha","p":0.14,"u":"g","s":"cost"},"chai":{"n":"Chai","p":0.029,"u":"g","s":"cost"},"golden":{"n":"Mélange golden latte","p":0.0516,"u":"g","s":"cost"},"choco_poudre":{"n":"Chocolat en poudre","p":0.02252,"u":"g","s":"cost"},"sesame":{"n":"Pâte de sésame","p":0.05,"u":"g","s":"cost"},"sarrasin":{"n":"Sarrasin (sobacha)","p":0.00595,"u":"g","s":"cost"},"the_jasmin":{"n":"Thé jasmin","p":0.1376,"u":"portion","s":"cost"},"the_poire":{"n":"Thé poire","p":0.1024,"u":"portion","s":"cost"},"rooibos":{"n":"Rooibos","p":0.1156,"u":"portion","s":"cost"},"miel":{"n":"Miel","p":0.00936,"u":"g","s":"fflow","c":"4,68 € les 500 g"},"lait_vache":{"n":"Lait entier UHT","p":0.001142,"u":"g","s":"cost"},"lait_avoine":{"n":"Lait d'avoine (Oatly)","p":0.001187,"u":"g","s":"cost"},"lait_coco":{"n":"Lait de coco barista","p":0.00242,"u":"g","s":"cost"},"puree_mangue":{"n":"Purée de mangue","p":0.01045,"u":"g","s":"cost"},"kombucha_fra":{"n":"Kombucha framboise","p":1.79,"u":"canette","s":"fflow","c":"42,96 € les 24"},"kombucha_fig":{"n":"Kombucha figue","p":2.19,"u":"canette","s":"cost"},"pain_choc":{"n":"Pain au chocolat cru","p":0.387375,"u":"pièce","s":"fflow","c":"30,99 € les 80"},"croissant":{"n":"Croissant cru","p":0.4575,"u":"pièce","s":"fflow","c":"27,45 € les 60"},"cake_banana":{"n":"Banana bread (part)","p":1.54,"u":"part","s":"mandy","c":"12,32 € le cake de 8 parts"},"cake_citron":{"n":"Cake citron (part)","p":2.01375,"u":"part","s":"mandy","c":"16,11 € le cake de 8 parts"},"cake_chocogf":{"n":"Cake chocolat sans gluten (part)","p":2.5125,"u":"part","s":"mandy","c":"20,10 € le cake, 8 parts supposées"},"cookie":{"n":"Cookie chocolat fleur de sel","p":1.247222,"u":"pièce","s":"mandy","c":"22,45 € la boîte de 18"},"granola":{"n":"Granola maison","p":0.006596,"u":"g","s":"cost"},"mesclun":{"n":"Mesclun","p":0.00775,"u":"g","s":"fflow","c":"7,75 € le kg"},"roquette":{"n":"Roquette","p":0.00775,"u":"g","s":"est","c":"approchée par le mesclun"},"tomate_coeur":{"n":"Tomate cœur de bœuf","p":0.00514,"u":"g","s":"fflow","c":"5,14 € le kg"},"tomate_roma":{"n":"Tomate Roma","p":0.00502,"u":"g","s":"fflow","c":"5,02 € le kg"},"pasteque":{"n":"Pastèque","p":0.00139,"u":"g","s":"fflow","c":"1,39 € le kg"},"feta":{"n":"Féta","p":0.01327,"u":"g","s":"fflow","c":"13,27 € le kg"},"fenouil":{"n":"Fenouil","p":0.00288,"u":"g","s":"fflow","c":"2,88 € le kg"},"burrata":{"n":"Burrata","p":0.01285,"u":"g","s":"fflow","c":"12,85 € le kg, boule de 125 g"},"mozzarella":{"n":"Mozzarella fior di latte","p":0.00942,"u":"g","s":"fflow","c":"9,42 € le kg"},"granny":{"n":"Pomme Granny","p":0.0029,"u":"g","s":"fflow","c":"2,90 € le kg"},"saumon":{"n":"Saumon fumé","p":0.0214,"u":"g","s":"fflow","c":"21,40 € le kg"},"coppa":{"n":"Coppa tranchée","p":0.02216,"u":"g","s":"fflow","c":"11,08 € les 500 g"},"cream_cheese":{"n":"Cream cheese","p":0.009473,"u":"g","s":"fflow","c":"14,21 € les 1,5 kg"},"pesto":{"n":"Pesto basilic","p":0.01705,"u":"g","s":"fflow","c":"6,82 € les 400 g"},"avocat":{"n":"Avocat Hass","p":0.92,"u":"pièce","s":"fflow"},"citron":{"n":"Citron jaune","p":0.00237,"u":"g","s":"fflow","c":"2,37 € le kg"},"oignon_rouge":{"n":"Oignon rouge","p":0.00094,"u":"g","s":"fflow","c":"0,94 € le kg"},"sumac":{"n":"Sumac","p":0.01368,"u":"g","s":"fflow","c":"6,84 € les 500 g"},"huile_olive":{"n":"Huile d'olive","p":0.006096,"u":"g","s":"fflow","c":"27,89 € les 5 L"},"aneth":{"n":"Aneth","p":0.81,"u":"botte","s":"fflow"},"basilic":{"n":"Basilic","p":0.59,"u":"botte","s":"fflow"},"coulis_mangue":{"n":"Coulis de mangue","p":0.00901,"u":"g","s":"fflow","c":"9,01 € le kg"},"vinaigre":{"n":"Vinaigre d'alcool","p":0.001,"u":"g","s":"est"},"sel":{"n":"Sel / fleur de sel","p":0.002,"u":"g","s":"est"},"pain_tranche":{"n":"Pain de mie, la tranche","p":0.2,"u":"tranche","s":"est","c":"absent des factures fournies"},"bun":{"n":"Bun","p":0.8,"u":"pièce","s":"est","c":"absent des factures fournies"}},"R":{"espresso":{"n":"Espresso","p":1,"i":[["gaitania",9]]},"double_espresso":{"n":"Double espresso","p":1,"i":[["gaitania",18]]},"americano":{"n":"Americano","p":1,"i":[["gaitania",18]]},"noisette":{"n":"Noisette","p":1,"i":[["gaitania",9],["lait_vache",136]]},"cappuccino":{"n":"Cappuccino","p":1,"i":[["gaitania",9],["lait_avoine",115]]},"latte":{"n":"Latte","p":1,"i":[["gaitania",9],["lait_vache",213]]},"flat_white":{"n":"Flat white","p":1,"i":[["gaitania",18],["lait_vache",105]]},"filtre":{"n":"Filtre / batch brew","p":1,"i":[["guji",12]]},"cold_brew":{"n":"Cold brew","p":1,"i":[["malawi",11.8]]},"mango_matcha":{"n":"Mango coco matcha","p":1,"i":[["matcha",2],["lait_coco",150],["puree_mangue",35]]},"matcha_latte":{"n":"Matcha latte","p":1,"i":[["matcha",2],["lait_vache",190]]},"chai_latte":{"n":"Chai latte","p":1,"i":[["chai",13],["lait_avoine",190]]},"golden_latte":{"n":"Golden latte","p":1,"i":[["golden",6],["lait_vache",190]]},"chocolat_chaud":{"n":"Chocolat chaud","p":1,"i":[["choco_poudre",15],["lait_vache",200]]},"iced_tea":{"n":"Iced tea","p":6.666666667,"i":[["the_poire",4],["miel",40]]},"the_jasmin":{"n":"Thé","p":1,"i":[["the_jasmin",1]]},"granola_bowl":{"n":"Granola bowl","p":1,"i":[["granola",9.7]]},"kombucha_fra":{"n":"Kombucha framboise","p":1,"i":[["kombucha_fra",1]]},"kombucha_fig":{"n":"Kombucha figue","p":1,"i":[["kombucha_fig",1]]},"pain_choc":{"n":"Pain au chocolat","p":1,"i":[["pain_choc",1]]},"croissant":{"n":"Croissant","p":1,"i":[["croissant",1]]},"cake_banana":{"n":"Banana bread","p":1,"i":[["cake_banana",1]]},"cake_citron":{"n":"Cake citron","p":1,"i":[["cake_citron",1]]},"cake_chocogf":{"n":"Cake chocolat sans gluten","p":1,"i":[["cake_chocogf",1]]},"cookie":{"n":"Cookie","p":1,"i":[["cookie",1]]},"vinaigrette":{"n":"Vinaigrette mangue-miel","p":30.3,"i":[["coulis_mangue",300],["vinaigre",100],["miel",70],["huile_olive",130],["sel",6]]},"salade_pasteque":{"n":"Salade pastèque féta","p":1,"i":[["mesclun",60],["pasteque",150],["feta",60],["fenouil",40],["aneth",0.16666666666666666],["basilic",0.16666666666666666],["huile_olive",10],["vinaigrette",1]]},"salade_burrata":{"n":"Salade burrata","p":1,"i":[["mesclun",60],["tomate_coeur",120],["burrata",125],["granny",60],["aneth",0.16666666666666666],["huile_olive",10],["vinaigrette",1]]},"salade_mozza":{"n":"Salade tomates mozza","p":1,"i":[["mesclun",60],["tomate_coeur",150],["mozzarella",100],["basilic",0.16666666666666666],["huile_olive",10],["vinaigrette",1]]},"toast_saumon":{"n":"Toast saumon","p":1,"i":[["pain_tranche",2],["cream_cheese",60],["saumon",70],["citron",5],["aneth",0.125],["huile_olive",5],["sel",2]]},"toast_avocat":{"n":"Toast avocat","p":1,"i":[["pain_tranche",2],["cream_cheese",40],["avocat",1],["citron",5],["oignon_rouge",20],["sumac",2]]},"toast_saumon_avocat":{"n":"Salmon avocado toast","p":1,"i":[["pain_tranche",2],["cream_cheese",60],["saumon",70],["avocat",1],["citron",5],["aneth",0.125],["huile_olive",5]]},"bun_caprese":{"n":"Bun caprese","p":1,"i":[["bun",1],["pesto",20],["roquette",30],["coppa",40],["tomate_roma",60],["mozzarella",60],["basilic",0.1],["huile_olive",5]]},"babyccino":{"n":"Babyccino","p":1,"i":[["lait_vache",200]]}},"MAP":{"LATTE":[["latte",1]],"MATCHA LATTE":[["matcha_latte",1]],"CAPPUCCINO":[["cappuccino",1]],"FLAT WHITE":[["flat_white",1]],"MANGO COCO MATCHA":[["mango_matcha",1]],"AMERICANO":[["americano",1]],"COLD BREW":[["cold_brew",1]],"ICED TEA":[["iced_tea",1]],"CHAI LATTE":[["chai_latte",1]],"ESPRESSO":[["espresso",1]],"DOUBLE ESPRESSO":[["double_espresso",1]],"CHOCOLAT CHAUD":[["chocolat_chaud",1]],"FILTRE / BATCH BREW":[["filtre",1]],"V60":[["filtre",1]],"THÉ":[["the_jasmin",1]],"ALLONGÉ":[["espresso",1]],"CORTADO":[["flat_white",1]],"NOISETTE":[["noisette",1]],"GOLDEN LATTE":[["golden_latte",1]],"BABYCCINO":[["babyccino",1]],"GRANOLA BOWL":[["granola_bowl",1]],"EXTRA SHOT CAFE":[["espresso",1]],"ESPRESSO COMMERCANT":[["espresso",1]],"EXTRA CAFE":[["espresso",1]],"CAKE":[["cake_banana",0.55725],["cake_citron",0.25573],["cake_chocogf",0.18702]],"COOKIE":[["cookie",1]],"VIENNOISERIE":[["pain_choc",0.8169],["croissant",0.1831]],"KOMBUCHA":[["kombucha_fra",0.92],["kombucha_fig",0.08]],"KOMBUCHA FRAMBOISE":[["kombucha_fra",1]],"KOMBUCHA FIGUE":[["kombucha_fig",1]],"SALADE":[["salade_mozza",0.63492],["salade_pasteque",0.36508]],"AVOCADO TOASTS":[["toast_avocat",1]],"BUN CAPRESE":[["bun_caprese",1]],"SALMON TOAST":[["toast_saumon",1]],"SALMON TOASTS":[["toast_saumon",1]],"FORMULE SALE":[["toast_avocat",0.28421],["toast_saumon_avocat",0.2],["bun_caprese",0.17895],["salade_burrata",0.12632],["toast_saumon",0.11579],["salade_pasteque",0.09474]],"FORMULE TOAST":[["toast_avocat",0.44729],["toast_saumon",0.2963],["toast_saumon_avocat",0.25641]]},"MOIS":{"2026-03":{"LATTE":[814,4002.58],"CAPPUCCINO":[634,2843.51],"CAKE":[503,2004.98],"FLAT WHITE":[397,2206.83],"COOKIE":[392,1402.04],"MATCHA LATTE":[302,1865.35],"VIENNOISERIE":[267,540.09],"ESPRESSO":[251,576.4],"AMERICANO":[211,750.87],"DOUBLE ESPRESSO":[190,610.43],"ALLONGÉ":[190,439.79],"CHAI LATTE":[177,925.48],"FORMULE TOAST":[168,2729.43],"FILTRE / BATCH BREW":[167,726.51],"NOISETTE":[124,457.16],"CHOCOLAT CHAUD":[119,631.33],"MANGO COCO MATCHA":[118,757.35],"THÉ":[100,357.96],"EXTRA SHOT CAFE":[89,82.5],"TIRAMISU LATTE":[81,510.25],"UBE LATTE":[71,377.92],"ICED TEA":[63,268.56],"COLD BREW":[46,251.04],"GOLDEN LATTE":[39,206.38],"KOMBUCHA FRAMBOISE":[35,147.63],"KOMBUCHA FIGUE":[35,149.86],"GRANOLA BOWL":[33,188.34],"Gaitania":[31,301.86],"Foccaccia Basilicate":[23,195.49],"MONT BLANC":[22,135.45],"AVOCADO TOASTS":[20,227.43],"Palermo":[15,172.48],"WOREDA":[14,247.64],"EXTRA SHOT LAIT":[13,12.15],"LA VIE EN ROSE":[13,178.48],"SALMON TOAST":[12,139.69],"GEISHA PIVARAL":[11,182.86],"Simeti":[9,76.67],"VIN":[8,40.82],"Kunde":[5,90.04],"CIDRE":[5,25.0],"SAMBA":[5,13.27],"Terrah":[5,52.14],"BIERE 33CL":[4,20.0],"(sans nom)":[4,108.87],"Boisson + Foccaccia":[4,41.44],"CAPSULES":[2,9.48],"Boisson + Foccaccia + dessert":[1,11.95],"Halo":[1,19.0],"ESPRESSO TONIC":[1,3.64],"V60":[1,8.18]},"2026-04":{"LATTE":[780,3850.07],"CAPPUCCINO":[480,2118.14],"CAKE":[422,1667.6],"FLAT WHITE":[337,1946.97],"MATCHA LATTE":[319,1954.85],"COOKIE":[299,1074.96],"VIENNOISERIE":[293,588.67],"ESPRESSO":[287,662.38],"AMERICANO":[223,816.04],"ALLONGÉ":[150,343.64],"FORMULE TOAST":[148,2419.81],"DOUBLE ESPRESSO":[147,468.4],"CHAI LATTE":[139,713.1],"MANGO COCO MATCHA":[130,847.2],"FILTRE / BATCH BREW":[116,510.89],"THÉ":[93,325.58],"TIRAMISU LATTE":[91,536.56],"CHOCOLAT CHAUD":[86,459.75],"MONT BLANC":[73,436.15],"NOISETTE":[73,269.58],"COLD BREW":[71,384.91],"ICED TEA":[69,291.89],"KOMBUCHA FRAMBOISE":[52,231.76],"UBE LATTE":[51,255.29],"EXTRA SHOT CAFE":[45,42.23],"GRANOLA BOWL":[34,181.72],"GOLDEN LATTE":[29,155.26],"SALMON TOAST":[19,215.13],"KOMBUCHA FIGUE":[19,83.97],"Gaitania":[17,216.71],"AVOCADO TOASTS":[14,157.65],"WOREDA":[13,177.34],"EXTRA SHOT LAIT":[12,11.24],"GEISHA PIVARAL":[10,169.01],"SAMBA":[8,26.54],"Simeti":[8,105.39],"LA VIE EN ROSE":[7,90.05],"BABYCCINO":[7,19.22],"CAPSULES":[5,23.7],"(sans nom)":[5,109.33],"ESPRESSO TONIC":[4,15.16],"V60":[2,16.36],"SOBACHA":[1,4.54],"BIERE 33CL":[1,5.0],"SESAME LATTE":[1,5.69],"CIDRE":[1,5.0]},"2026-05":{"LATTE":[754,3718.52],"CAPPUCCINO":[436,1889.21],"CAKE":[332,1290.97],"COOKIE":[307,1089.39],"MATCHA LATTE":[274,1631.74],"FLAT WHITE":[274,1562.09],"VIENNOISERIE":[245,487.3],"ESPRESSO":[234,526.99],"AMERICANO":[219,784.92],"FORMULE TOAST":[173,2789.39],"ALLONGÉ":[155,351.41],"ICED TEA":[134,559.15],"DOUBLE ESPRESSO":[132,411.97],"MANGO COCO MATCHA":[125,786.27],"TIRAMISU LATTE":[122,743.94],"CHAI LATTE":[107,579.78],"FILTRE / BATCH BREW":[97,442.16],"COLD BREW":[91,490.17],"NOISETTE":[89,327.09],"EXTRA SHOT CAFE":[83,77.31],"MONT BLANC":[82,503.5],"THÉ":[73,248.75],"CHOCOLAT CHAUD":[71,380.47],"UBE LATTE":[56,296.37],"Gaitania":[35,289.36],"KOMBUCHA FRAMBOISE":[35,147.86],"GRANOLA BOWL":[35,198.22],"LA VIE EN ROSE":[29,423.68],"KOMBUCHA FIGUE":[29,105.68],"EXTRA SHOT LAIT":[21,19.39],"Simeti":[18,208.06],"GOLDEN LATTE":[15,66.13],"WOREDA":[14,236.11],"AVOCADO TOASTS":[13,150.51],"BABYCCINO":[9,21.95],"SALMON TOAST":[9,100.93],"(sans nom)":[6,51.31],"CAPSULES":[5,67.18],"SAMBA":[4,0.0],"CIDRE":[2,5.0],"JIMMA - DÉCA":[2,28.44],"GEISHA PIVARAL":[2,37.92],"SOBACHA":[2,4.54],"Palermo":[2,34.12],"V60":[1,8.18]},"2026-06":{"V60":[1,8.18],"ICED TEA":[220,972.32],"MANGO COCO MATCHA":[196,1323.98],"KOMBUCHA FRAMBOISE":[77,323.58],"CHAI LATTE":[83,426.38],"THÉ":[41,146.94],"Gaitania":[25,200.64],"NOISETTE":[64,217.72],"FLAT WHITE":[166,978.86],"COPPA DE BOEUF":[4,3.11],"ESPRESSO TONIC":[5,18.5],"SALMON TOAST":[8,90.94],"GEISHA PIVARAL":[1,18.96],"CIDRE":[19,90.0],"BABYCCINO":[2,5.46],"JIMMA - DÉCA":[1,14.22],"(sans nom)":[8,126.84],"EAU PLATE":[36,68.17],"GOLDEN LATTE":[18,82.75],"EAU PETILLANTE":[3,8.52],"BUN CAPRESE":[38,294.23],"SALADE":[33,366.5],"CORTADO":[7,32.23],"MONT BLANC":[64,402.12],"BIERE 33CL":[90,445.0],"CHOCOLAT CHAUD":[44,231.73],"EXTRA SHOT CAFE":[113,105.97],"AVOCADO TOASTS":[16,185.15],"ESPRESSO":[216,493.64],"ESP MAR":[135,1409.98],"TIRAMISU LATTE":[77,470.29],"COLD BREW":[142,787.01],"SAMBA":[8,53.08],"Simeti":[15,189.94],"LATTE":[876,4264.74],"WOREDA":[13,194.6],"GRANOLA BOWL":[31,153.22],"DOUBLE ESPRESSO":[139,444.69],"CAKE":[315,1226.34],"UBE LATTE":[40,193.44],"CAPPUCCINO":[279,1219.89],"AMERICANO":[232,838.75],"ALLONGÉ":[126,283.08],"LA VIE EN ROSE":[15,236.11],"COOKIE":[204,737.15],"EXTRA SHOT LAIT":[18,16.7],"VIENNOISERIE":[201,404.31],"MATCHA LATTE":[254,1593.34],"FORMULE TOAST":[139,2289.36],"KOMBUCHA FIGUE":[38,167.52],"FILTRE / BATCH BREW":[92,410.45]},"2026-07":{"ICED TEA":[177,748.42],"AVOCADO TOASTS":[61,708.83],"CORTADO":[33,137.39],"FORMULE SALE":[58,1055.15],"KOMBUCHA":[29,127.24],"GRANOLA BOWL":[35,172.69],"CHOCOLAT CHAUD":[41,216.23],"MANGO COCO MATCHA":[133,856.15],"EXTRA SHOT LAIT":[20,17.61],"SALMON TOAST":[44,506.41],"TIRAMISU LATTE":[74,472.75],"WOREDA":[21,345.12],"Gaitania":[16,213.29],"SAMBA":[6,0.0],"ALLONGÉ":[89,198.13],"(sans nom)":[2,53.56],"THÉ":[27,101.25],"BIERE 33CL":[2,10.0],"AMERICANO":[194,703.79],"CIDRE":[2,10.0],"SIMETI":[1,15.16],"CAPSULES":[2,42.66],"BUN CAPRESE":[48,398.71],"MONT BLANC":[69,458.23],"UBE LATTE":[34,172.82],"VIENNOISERIE":[224,455.87],"CAKE":[257,958.12],"MATCHA LATTE":[229,1376.09],"NOISETTE":[23,84.83],"CHAI LATTE":[61,307.67],"Simeti":[1,0.0],"ESPRESSO COMMERCANT":[3,2.85],"KOMBUCHA FIGUE":[16,69.35],"FILTRE / BATCH BREW":[38,176.48],"EXTRA SIROP":[18,7.09],"ESPRESSO":[196,452.73],"EXTRA SHOT CAFE":[81,72.89],"FORMULE TOAST":[74,1188.2],"COPPA DE BOEUF":[22,17.36],"DOUBLE ESPRESSO":[118,372.79],"COLD BREW":[156,830.18],"SALADE":[110,1219.69],"GOLDEN LATTE":[32,166.19],"CAPPUCCINO":[236,1038.31],"FLAT WHITE":[162,902.49],"LATTE":[723,3580.12],"COOKIE":[190,624.27],"KOMBUCHA FRAMBOISE":[25,110.87]},"2026-08":{"LATTE":[581,2817.25],"FORMULE SALE":[95,1690.52],"MATCHA LATTE":[201,1200.5],"CAPPUCCINO":[238,1089.35],"CAKE":[262,873.04],"FLAT WHITE":[159,840.29],"MANGO COCO MATCHA":[127,839.15],"AMERICANO":[215,778.86],"COLD BREW":[143,772.17],"SALADE":[63,695.42],"AVOCADO TOASTS":[52,592.71],"COOKIE":[183,587.59],"TIRAMISU LATTE":[82,536.14],"ICED TEA":[119,532.01],"MONT BLANC":[78,503.51],"CHAI LATTE":[84,456.98],"BUN CAPRESE":[54,450.87],"ESPRESSO":[167,383.02],"DOUBLE ESPRESSO":[94,305.92],"SALMON TOAST":[25,294.62],"CHOCOLAT CHAUD":[55,289.18],"VIENNOISERIE":[142,283.86],"PINK LATTE":[49,273.75],"UBE LATTE":[51,266.68],"SALMON TOASTS":[16,199.27],"SIMETI":[13,178.34],"FILTRE / BATCH BREW":[39,171.75],"GRANOLA BOWL":[37,160.73],"THÉ":[33,133.17],"ALLONGÉ":[54,126.0],"CORTADO":[27,113.08],"KOMBUCHA":[25,112.22],"CARNAVAL":[8,107.83],"WOREDA":[6,105.54],"NOISETTE":[22,81.26],"Oeuf à la coque":[16,62.62],"GOLDEN LATTE":[11,60.9],"OEUF À LA COQUE":[12,46.97],"SAMBA":[6,39.81],"EXTRA SHOT CAFE":[39,36.85],"Gaitania":[4,36.25],"CABALLERO":[2,30.33],"GAITANIA":[7,27.02],"CAPSULES":[1,21.33],"COPPA DE BOEUF":[25,19.66],"EXTRA SIROP":[46,17.8],"(sans nom)":[3,15.45],"EXTRA CAFE":[16,15.08],"ESPRESSO COMMERCANT":[13,12.87],"EXTRA OEUF":[8,12.62],"EXTRA SHOT LAIT":[12,11.32],"EXTRA Oeuf":[7,10.83],"CIDRE":[2,10.0],"BIERE 33CL":[2,10.0]},"2026-09":{"LATTE":[221,1073.72],"FORMULE SALE":[45,772.14],"CAPPUCCINO":[107,486.23],"CAKE":[94,307.63],"MATCHA LATTE":[45,265.94],"FLAT WHITE":[47,257.2],"AMERICANO":[63,228.62],"AVOCADO TOASTS":[24,219.4],"ICED TEA":[51,187.96],"TIRAMISU LATTE":[28,183.95],"MANGO COCO MATCHA":[31,177.96],"COOKIE":[54,155.33],"DOUBLE ESPRESSO":[46,150.35],"CHAI LATTE":[32,149.18],"SALMON TOASTS":[11,130.56],"VIENNOISERIE":[65,130.45],"MONT BLANC":[18,119.13],"ESPRESSO":[52,118.72],"BUN CAPRESE":[13,107.75],"COLD BREW":[17,94.82],"FILTRE / BATCH BREW":[21,93.46],"WOREDA":[5,85.55],"UBE LATTE":[15,83.1],"SALADE":[7,77.29],"GRANOLA BOWL":[14,66.74],"SIMETI":[5,61.51],"THÉ":[14,59.03],"OEUF À LA COQUE":[15,58.23],"CORTADO":[12,50.16],"CHOCOLAT CHAUD":[9,48.87],"KOMBUCHA":[10,48.25],"ALLONGÉ":[22,47.52],"CARNAVAL":[5,45.49],"GOLDEN LATTE":[7,39.12],"GAITANIA":[1,15.0],"EXTRA CAFE":[12,11.32],"NOISETTE":[3,10.55],"EXTRA SIROP":[19,7.44],"EXTRA SHOT LAIT":[7,6.39],"EXTRA OEUF":[3,4.67],"ESPRESSO COMMERCANT":[3,2.85],"COPPA DE BOEUF":[2,1.57],"JIMMA - DÉCA":[1,0.0]}},"MOTIF":{"TIRAMISU LATTE":"recette à créer","MONT BLANC":"recette à créer","UBE LATTE":"recette à créer","PINK LATTE":"recette à créer","LA VIE EN ROSE":"recette à créer","ESP MAR":"recette à créer","ESPRESSO TONIC":"recette à créer","Palermo":"recette à créer","Foccaccia Basilicate":"recette à créer","Oeuf à la coque":"doublon de casse avec OEUF À LA COQUE","OEUF À LA COQUE":"recette à créer","EXTRA Oeuf":"doublon de casse avec EXTRA OEUF","EXTRA OEUF":"prix d'achat","Gaitania":"doublon de casse avec GAITANIA","Simeti":"doublon de casse avec SIMETI","(sans nom)":"article sans nom dans Square","EXTRA SIROP":"prix d'achat au dosage","EXTRA SHOT LAIT":"prix d'achat au dosage","CAPSULES":"prix d'achat","COPPA DE BOEUF":"prix d'achat","CIDRE":"prix d'achat","BIERE 33CL":"prix d'achat","EAU PLATE":"prix d'achat","EAU PETILLANTE":"prix d'achat","SIMETI":"café en grains : coût de revient torréfaction","CARNAVAL":"café en grains : coût de revient torréfaction","WOREDA":"café en grains : coût de revient torréfaction","SAMBA":"café en grains : coût de revient torréfaction","CABALLERO":"café en grains : coût de revient torréfaction","GAITANIA":"café en grains : coût de revient torréfaction","GEISHA PIVARAL":"café en grains : coût de revient torréfaction","JIMMA - DÉCA":"café en grains : coût de revient torréfaction","Kunde":"café en grains : coût de revient torréfaction"},"PARTIEL":{"2026-09":{"du":"2026-09-01","au":"2026-09-09","jours":9,"jours_mois":30,"releve":"2026-09-10T09:18:55.712Z"}}};
   var ING = REF.I, REC = REF.R, MAP = REF.MAP, MOIS = REF.MOIS, MOTIF = REF.MOTIF;
   var LISTE_MOIS = Object.keys(MOIS).sort();
   var NOM_MOIS = ["janv.","févr.","mars","avr.","mai","juin","juil.","août","sept.","oct.","nov.","déc."];
@@ -1766,6 +1955,35 @@ demarrerEnClair();
     var t = 0, v = MOIS[m];
     for (var n in v) t += v[n][1];
     return t;
+  }
+
+  /* Mois en cours. REF.PARTIEL dit du combien au combien il est relevé. Ses
+     ventes servent de mix comme celles des autres mois ; son CA, lui, n'est
+     jamais présenté comme un réalisé mensuel : on montre ce qui est encaissé,
+     et la projection à part, désignée comme telle. */
+  var PARTIEL = REF.PARTIEL || {};
+  function estPartiel(m) { return !!PARTIEL[m]; }
+  function projection(m) {
+    var p = PARTIEL[m];
+    return p ? Math.round(caDuMois(m) / p.jours * p.jours_mois) : caDuMois(m);
+  }
+  var MOIS_CLOS = LISTE_MOIS.filter(function (m) { return !estPartiel(m); });
+  var EN_COURS = LISTE_MOIS.filter(estPartiel).pop() || null;
+  function joursDansMois(m) { return new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate(); }
+  function moisCourt(m) {
+    return NOM_MOIS[+m.slice(5, 7) - 1] + (estPartiel(m) ? " (" + PARTIEL[m].jours + " j)" : "");
+  }
+  function deMois(m) { var l = libelleMois(m); return (/^[aeiou]/i.test(l) ? "d'" : "de ") + l; }
+  var NOM_LONG = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
+  function moisLong(m) { return NOM_LONG[+m.slice(5, 7) - 1] + " " + m.slice(0, 4); }
+  function majuscule(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
+  if (EN_COURS) REPERES.push({ nom: NOM_MOIS[+EN_COURS.slice(5, 7) - 1] + " projeté",
+    ca: Math.round(projection(EN_COURS)), projete: true });
+  /* Calcule f() comme si le mois m était le mois de référence, puis rend la main. */
+  function auMix(m, f) {
+    var garde = PRODUITS;
+    chargerMois(m);
+    try { return f(); } finally { PRODUITS = garde; }
   }
 
 
@@ -1882,7 +2100,7 @@ demarrerEnClair();
       var sup = document.createElement("button");
       sup.type = "button"; sup.textContent = "×";
       sup.setAttribute("aria-label", "Retirer " + p.nom);
-      nom.addEventListener("input", function () { E.equipe[k].nom = nom.value; sauver(); });
+      nom.addEventListener("input", function () { E.equipe[k].nom = nom.value; barre(); });
       val.addEventListener("input", function () { E.equipe[k].v = +val.value || 0; rendre(); });
       sup.addEventListener("click", function () {
         E.equipe.splice(k, 1); batirEquipe(); rendre();
@@ -1948,11 +2166,11 @@ demarrerEnClair();
   }
 
 
-  /* Onglets : le choix est gardé par navigateur, pour retrouver le panneau
-     sur lequel on travaillait. */
+  /* Onglets : chaque visite repart de l'onglet par défaut, rien n'est gardé
+     dans le navigateur. */
   function brancherOnglets(prefixe, defaut) {
     var boutons = [].slice.call(document.querySelectorAll('[id^="' + prefixe + '-"][role="tab"]'));
-    function choisir(cle, memoriser) {
+    function choisir(cle) {
       boutons.forEach(function (b) {
         var actif = b.id === prefixe + "-" + cle + "-t";
         b.setAttribute("aria-selected", actif ? "true" : "false");
@@ -1961,11 +2179,10 @@ demarrerEnClair();
         var p = document.getElementById(b.id.replace(/-t$/, ""));
         if (p) p.hidden = !actif;
       });
-      if (memoriser) { try { localStorage.setItem("terrah-onglet-" + prefixe, cle); } catch (e) { /* refusé */ } }
     }
     boutons.forEach(function (b, k) {
       var cle = b.id.slice(prefixe.length + 1, -2);
-      b.addEventListener("click", function () { choisir(cle, true); });
+      b.addEventListener("click", function () { choisir(cle); });
       b.addEventListener("keydown", function (ev) {
         var d = ev.key === "ArrowRight" ? 1 : ev.key === "ArrowLeft" ? -1 : 0;
         if (!d) return;
@@ -1974,10 +2191,7 @@ demarrerEnClair();
         v.focus(); v.click();
       });
     });
-    var garde = null;
-    try { garde = localStorage.getItem("terrah-onglet-" + prefixe); } catch (e) { /* refusé */ }
-    var connu = boutons.some(function (b) { return b.id === prefixe + "-" + garde + "-t"; });
-    choisir(connu ? garde : defaut, false);
+    choisir(defaut);
   }
 
 
@@ -1985,10 +2199,15 @@ demarrerEnClair();
     var h = $("mois"); h.textContent = "";
     LISTE_MOIS.forEach(function (m) {
       var b = document.createElement("button");
-      b.type = "button"; b.textContent = libelleMois(m);
+      b.type = "button"; b.textContent = libelleMois(m) + (estPartiel(m) ? " · en cours" : "");
+      if (estPartiel(m)) {
+        b.className = "partiel";
+        b.title = "Mois incomplet : " + PARTIEL[m].jours + " jours sur " + PARTIEL[m].jours_mois
+          + ". Le CA de départ est une projection.";
+      }
       b.setAttribute("aria-pressed", m === E.mois ? "true" : "false");
       b.addEventListener("click", function () {
-        E.mois = m; E.ca = caDuMois(m);
+        E.mois = m; E.ca = estPartiel(m) ? Math.round(projection(m)) : caDuMois(m);
         chargerMois(m);
         $("ca").value = E.ca.toFixed(0); $("ca-r").value = E.ca;
         batirMois(); rendre();
@@ -1999,35 +2218,55 @@ demarrerEnClair();
 
   /* Marge brute mois par mois, au mix réellement vendu. */
   function margeDuMois(m) {
-    var garde = PRODUITS;
-    chargerMois(m);
-    var cm = coutMatiere(E.suppose);
-    PRODUITS = garde;
-    return { ca: cm.caTotal, taux: cm.taux, couv: cm.caConnu / cm.caTotal,
-             marge: 1 - cm.taux - E.commission / 100 };
+    return auMix(m, function () {
+      var cm = coutMatiere(E.suppose), q = 0;
+      PRODUITS.forEach(function (p) { q += p.q; });
+      var marge = 1 - cm.taux - E.commission / 100;
+      return { m: m, ca: cm.caTotal, q: q, cout: cm.cout, cu: q ? cm.cout / q : null,
+               couv: cm.caConnu / cm.caTotal, taux: cm.taux, marge: marge, mEur: cm.caTotal * marge };
+    });
   }
   function dessinerMarges() {
-    var tb = $("marge-mois"); if (!tb) return;
-    tb.textContent = "";
-    LISTE_MOIS.forEach(function (m) {
-      var r = margeDuMois(m);
-      var tr = ligne(tb, [libelleMois(m), eur(r.ca), pct(r.couv), pct(r.taux),
-        { t: pct(r.marge), couleur: "var(--vert)" }]);
-    });
+    if (!$("marge-mois")) return;
+    tableTriable("marge-mois", [
+      { t: "Mois", tri: function (d) { return d.m; } },
+      { t: "CA HT", tri: function (d) { return d.ca; }, num: true },
+      { t: "Articles", tri: function (d) { return d.q; }, num: true },
+      { t: "Coût/article", tri: function (d) { return d.cu; }, num: true },
+      { t: "Couverture", tri: function (d) { return d.couv; }, num: true },
+      { t: "Coût matière", tri: function (d) { return d.taux; }, num: true },
+      { t: "Taux de marge", tri: function (d) { return d.marge; }, num: true },
+      { t: "Marge €", tri: function (d) { return d.mEur; }, num: true }
+    ], LISTE_MOIS.map(function (m) {
+      var r = margeDuMois(m), P = PARTIEL[m];
+      return { d: r, cls: P ? "partiel" : "",
+        cellules: [P ? { html: libelleMois(m) + "<span class='pastille enc'>en cours · " + P.jours + " j</span>" } : libelleMois(m),
+          eur(r.ca), entier(r.q), nb(r.cu, 2), pct(r.couv), pct(r.taux),
+          { t: pct(r.marge), couleur: "var(--vert)" }, eur(r.mEur)] };
+    }), { col: 0, sens: 1 });
+    $("marge-mois-note").textContent = EN_COURS
+      ? majuscule(moisLong(EN_COURS)) + " ne compte que " + PARTIEL[EN_COURS].jours + " jours sur "
+        + PARTIEL[EN_COURS].jours_mois + " : son CA, ses articles et sa marge en euros sont ceux de ces jours-là, "
+        + "pas d'un mois. Ses taux, eux, se comparent aux autres mois. Projection sur le mois entier : "
+        + eur(projection(EN_COURS)) + "."
+      : "";
   }
 
   function dessinerSpark() {
     var svg = $("spark"); svg.textContent = "";
     var vals = HISTO.map(function (h) { return h[1]; });
-    var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+    /* Le mois en cours s'ajoute en pointillé, à sa valeur projetée. */
+    var proj = EN_COURS ? projection(EN_COURS) : null;
+    var tout = proj === null ? vals : vals.concat([proj]);
+    var min = Math.min.apply(null, tout), max = Math.max.apply(null, tout);
     var etendue = max - min || 1;
-    var x = function (i) { return 2 + i * (296 / (vals.length - 1)); };
+    var x = function (i) { return 4 + i * (291 / (tout.length - 1)); };
     var y = function (v) { return 46 - ((v - min) / etendue) * 38; };
     var d = "";
     for (var i = 0; i < vals.length; i++) d += (i ? "L" : "M") + x(i).toFixed(1) + " " + y(vals[i]).toFixed(1) + " ";
     var ns = "http://www.w3.org/2000/svg";
     var aire = document.createElementNS(ns, "path");
-    aire.setAttribute("d", d + "L" + x(vals.length - 1).toFixed(1) + " 50 L2 50 Z");
+    aire.setAttribute("d", d + "L" + x(vals.length - 1).toFixed(1) + " 50 L4 50 Z");
     aire.setAttribute("fill", "var(--trait)"); aire.setAttribute("stroke", "none");
     svg.appendChild(aire);
     var ligne = document.createElementNS(ns, "path");
@@ -2040,8 +2279,33 @@ demarrerEnClair();
     pt.setAttribute("cy", y(vals[vals.length - 1]).toFixed(1));
     pt.setAttribute("r", "3"); pt.setAttribute("fill", "var(--rouge)");
     svg.appendChild(pt);
-    $("spark-aide").textContent = "Septembre 2025 → août 2026 : " + eur(vals[0]) + " puis "
+    var texte = "Septembre 2025 → août 2026 : " + eur(vals[0]) + " puis "
       + eur(vals[vals.length - 1]) + ", soit " + pct((vals[vals.length - 1] - vals[0]) / vals[0], 0) + " en douze mois.";
+    if (proj !== null) {
+      var suite = document.createElementNS(ns, "path");
+      suite.setAttribute("d", "M" + x(vals.length - 1).toFixed(1) + " " + y(vals[vals.length - 1]).toFixed(1)
+        + " L" + x(tout.length - 1).toFixed(1) + " " + y(proj).toFixed(1));
+      suite.setAttribute("fill", "none"); suite.setAttribute("stroke", "var(--laiton)");
+      suite.setAttribute("stroke-width", "1.5"); suite.setAttribute("stroke-dasharray", "3 3");
+      suite.setAttribute("vector-effect", "non-scaling-stroke");
+      svg.appendChild(suite);
+      var pp = document.createElementNS(ns, "circle");
+      pp.setAttribute("cx", x(tout.length - 1).toFixed(1)); pp.setAttribute("cy", y(proj).toFixed(1));
+      pp.setAttribute("r", "3"); pp.setAttribute("fill", "var(--carte)");
+      pp.setAttribute("stroke", "var(--laiton)"); pp.setAttribute("stroke-width", "1.5");
+      svg.appendChild(pp);
+      var P = PARTIEL[EN_COURS];
+      texte += " En pointillé, " + moisLong(EN_COURS) + " en cours : " + eur(caDuMois(EN_COURS)) + " en "
+        + P.jours + " jours, projeté à " + eur(proj) + " sur " + P.jours_mois + " jours";
+      /* même mois un an plus tôt, s'il est dans l'historique */
+      var an = (+EN_COURS.slice(0, 4) - 1) + EN_COURS.slice(4);
+      HISTO.forEach(function (h) {
+        if (h[0] === an) texte += ", soit " + pct((proj - h[1]) / h[1], 0) + " sur " + moisLong(an);
+      });
+      texte += ". Une projection, pas un réalisé.";
+      svg.setAttribute("aria-label", "Chiffre d'affaires mensuel des douze derniers mois, et " + libelleMois(EN_COURS) + " projeté");
+    }
+    $("spark-aide").textContent = texte;
   }
 
   function dessinerJauge(r, pm) {
@@ -2054,11 +2318,19 @@ demarrerEnClair();
     rempli.className = "remplie"; rempli.style.width = p(r.ca) + "%";
     rempli.style.background = r.ebitda >= 0 ? "var(--vert)" : "var(--rouge)";
     j.appendChild(rempli);
-    REPERES.forEach(function (rep) {
-      var t = document.createElement("div"); t.className = "tick"; t.style.left = p(rep.ca) + "%"; j.appendChild(t);
-      var tx = document.createElement("div"); tx.className = "tick-txt";
-      tx.style.left = p(rep.ca) + "%"; tx.textContent = rep.nom; j.appendChild(tx);
+    /* Deux repères trop proches se chevaucheraient : le second descend d'une
+       ligne. La largeur d'une étiquette est estimée (police à chasse fixe). */
+    var larg = j.getBoundingClientRect().width || 600, bords = [], plusBas = 0;
+    REPERES.slice().sort(function (a, b) { return a.ca - b.ca; }).forEach(function (rep) {
+      var x = p(rep.ca), px = x / 100 * larg, demi = rep.nom.length * 3.3 + 5, rang = 0;
+      while (bords[rang] !== undefined && px - demi < bords[rang]) rang++;
+      bords[rang] = px + demi; plusBas = Math.max(plusBas, rang);
+      var t = document.createElement("div"); t.className = "tick" + (rep.projete ? " projete" : "");
+      t.style.left = x + "%"; j.appendChild(t);
+      var tx = document.createElement("div"); tx.className = "tick-txt" + (rep.projete ? " projete" : "");
+      tx.style.left = x + "%"; tx.style.top = (41 + rang * 13) + "px"; tx.textContent = rep.nom; j.appendChild(tx);
     });
+    j.style.height = (46 + plusBas * 13) + "px";   /* hauteur, pas marge : les marges fusionneraient */
     if (pm.ca) {
       var s = document.createElement("div"); s.className = "seuil"; s.style.left = p(pm.ca) + "%"; j.appendChild(s);
       var st = document.createElement("div"); st.className = "seuil-txt";
@@ -2117,47 +2389,118 @@ demarrerEnClair();
     return tr;
   }
 
-  function dessinerTables(cm) {
-    var manquants = PRODUITS.filter(function (p) { return !p.v; });
-    var tb = $("a-chiffrer"); tb.textContent = "";
-    manquants.forEach(function (p) {
-      ligne(tb, [p.n, p.q, eur(p.ca), pct(p.ca / cm.caTotal),
-        { t: p.ou || "recette à créer", cls:"motif" }]);
+  /* ------------------------------------------------------------------ tris
+     Un clic sur un en-tête trie la colonne, un second inverse le sens. Les
+     cases vides restent en bas dans les deux sens. L'état du tri vit en
+     mémoire, le temps de la visite ; chaque recalcul le respecte. */
+  var TRIS = {};
+  function tableTriable(id, colonnes, lignes, defaut, focus) {
+    var tb = $(id), table = tb.parentNode;
+    var etat = TRIS[id] || (TRIS[id] = { col: defaut.col, sens: defaut.sens });
+    var tr = document.createElement("tr");
+    colonnes.forEach(function (c, k) {
+      var th = document.createElement("th");
+      if (c.tri) {
+        th.setAttribute("aria-sort", etat.col === k ? (etat.sens > 0 ? "ascending" : "descending") : "none");
+        var b = document.createElement("button");
+        b.type = "button"; b.className = "tri"; b.textContent = c.t;
+        b.title = "Trier par " + c.t.toLowerCase();
+        b.addEventListener("click", function () {
+          if (etat.col === k) etat.sens = -etat.sens;
+          else { etat.col = k; etat.sens = c.num ? -1 : 1; }
+          tableTriable(id, colonnes, lignes, defaut, k);
+        });
+        th.appendChild(b);
+      } else th.textContent = c.t;
+      tr.appendChild(th);
     });
+    table.tHead.textContent = "";
+    table.tHead.appendChild(tr);
+    var cle = colonnes[etat.col].tri;
+    var ordre = lignes.map(function (l, i) { return { l: l, i: i, v: cle(l.d) }; });
+    ordre.sort(function (a, b) {
+      var va = a.v, vb = b.v;
+      var videA = va === null || va === undefined || (typeof va === "number" && !isFinite(va));
+      var videB = vb === null || vb === undefined || (typeof vb === "number" && !isFinite(vb));
+      if (videA || videB) return videA === videB ? a.i - b.i : (videA ? 1 : -1);
+      var r = typeof va === "string" ? va.localeCompare(vb, "fr") : va - vb;
+      return r ? r * etat.sens : a.i - b.i;
+    });
+    tb.textContent = "";
+    ordre.forEach(function (o) {
+      var ligneTr = ligne(tb, o.l.cellules);
+      if (o.l.cls) ligneTr.className = o.l.cls;
+      if (o.l.apres) o.l.apres(tb);
+    });
+    if (focus !== undefined) {
+      var bt = table.tHead.querySelectorAll("th")[focus].querySelector("button");
+      if (bt) bt.focus();
+    }
+  }
+  /* Une part de variante × une quantité donne 26,99995 : on affiche 27. */
+  function qte(x) { var r = Math.round(x * 10) / 10; return String(r).replace(".", ","); }
+  function entier(x) { return String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, NB); }
+  function nb(x, d) { return (x === null || !isFinite(x)) ? "—" : eur(x, d); }
+  function pc(x) { return (x === null || !isFinite(x)) ? "—" : pct(x); }
+
+  function dessinerTables(cm) {
+    var caMois = "CA " + moisCourt(E.mois);
+    var manquants = PRODUITS.filter(function (p) { return !p.v; });
+    tableTriable("a-chiffrer", [
+      { t: "Produit", tri: function (d) { return d.n; } },
+      { t: "Vendus", tri: function (d) { return d.q; }, num: true },
+      { t: caMois, tri: function (d) { return d.ca; }, num: true },
+      { t: "Part", tri: function (d) { return d.part; }, num: true },
+      { t: "Où trouver le coût", tri: function (d) { return d.ou; } }
+    ], manquants.map(function (p) {
+      var d = { n: p.n, q: p.q, ca: p.ca, part: cm.caTotal ? p.ca / cm.caTotal : null, ou: p.ou || "recette à créer" };
+      return { d: d, cellules: [p.n, p.q, eur(p.ca), pc(d.part), { t: d.ou, cls: "motif" }] };
+    }), { col: 2, sens: -1 });
     $("atc-intro").textContent = manquants.length + " articles sur " + PRODUITS.length
       + " n'ont pas de recette, soit " + eur(cm.caInconnu) + " — " + pct(cm.caInconnu / cm.caTotal)
-      + " du chiffre d'affaires d'août. Ils prennent le taux supposé réglé à gauche.";
+      + " du chiffre d'affaires " + deMois(E.mois) + (estPartiel(E.mois) ? " (" + PARTIEL[E.mois].jours + " premiers jours)" : "")
+      + ". Ils prennent le taux supposé réglé à gauche. Pas de recette, donc pas de coût unitaire ni de marge à trier ici.";
 
-    var connus = PRODUITS.filter(function (p) { return p.v; })
-      .sort(function (a, b) { return b.ca - a.ca; });
-    var tm = $("marges"); tm.textContent = "";
-    connus.forEach(function (p) {
+    var connus = PRODUITS.filter(function (p) { return p.v; });
+    tableTriable("marges", [
+      { t: "Produit", tri: function (d) { return d.n; } },
+      { t: "Vendus", tri: function (d) { return d.q; }, num: true },
+      { t: "Coût/unité", tri: function (d) { return d.cu; }, num: true },
+      { t: "Coût total", tri: function (d) { return d.c; }, num: true },
+      { t: caMois, tri: function (d) { return d.ca; }, num: true },
+      { t: "Marge €", tri: function (d) { return d.m; }, num: true },
+      { t: "Taux de marge", tri: function (d) { return d.t; }, num: true }
+    ], connus.map(function (p) {
       var c = coutProduit(p);
-      ligne(tm, [p.n, p.q, eur(c / p.q, 3), eur(c), eur(p.ca), pct(1 - c / p.ca)]);
+      var d = { n: p.n, q: p.q, cu: p.q ? c / p.q : null, c: c, ca: p.ca, m: p.ca - c, t: p.ca ? 1 - c / p.ca : null };
       /* Plusieurs variantes : on montre le coût de chacune, c'est là que se
-         voient les écarts entre recettes. */
-      if (p.v.length > 1) p.v.forEach(function (o) {
-        var tr = document.createElement("tr");
-        var a = document.createElement("td");
-        a.textContent = "└ " + REC[o[0]].n;
-        a.style.paddingLeft = "22px"; a.style.fontSize = "12px";
-        var b = document.createElement("td"); b.textContent = o[1];
-        var cc = document.createElement("td"); cc.textContent = eur(coutRecette(o[0]), 3);
-        var dd = document.createElement("td"); dd.colSpan = 3; dd.textContent = "";
-        [a, b, cc].forEach(function (x) { x.style.color = "var(--attenue)"; });
-        tr.appendChild(a); tr.appendChild(b); tr.appendChild(cc); tr.appendChild(dd);
-        tm.appendChild(tr);
-      });
-    });
+         voient les écarts entre recettes. Elles suivent leur produit au tri. */
+      var apres = p.v.length > 1 ? function (tb) {
+        p.v.forEach(function (o) {
+          var tr = document.createElement("tr");
+          var a = document.createElement("td");
+          a.textContent = "└ " + REC[o[0]].n;
+          a.style.paddingLeft = "22px"; a.style.fontSize = "12px";
+          var b = document.createElement("td"); b.textContent = qte(o[1]);
+          var cc = document.createElement("td"); cc.textContent = eur(coutRecette(o[0]), 3);
+          var dd = document.createElement("td"); dd.colSpan = 4; dd.textContent = "";
+          [a, b, cc].forEach(function (x) { x.style.color = "var(--attenue)"; });
+          tr.appendChild(a); tr.appendChild(b); tr.appendChild(cc); tr.appendChild(dd);
+          tb.appendChild(tr);
+        });
+      } : null;
+      return { d: d, apres: apres,
+        cellules: [p.n, p.q, nb(d.cu, 3), eur(c), eur(p.ca), eur(d.m), pc(d.t)] };
+    }), { col: 4, sens: -1 });
 
     var cake = null, cookie = null;
     PRODUITS.forEach(function (p) {
-      if (p.n === "CAKE") cake = coutProduit(p) / p.ca;
-      if (p.n === "COOKIE") cookie = coutProduit(p) / p.ca;
+      if (p.n === "CAKE" && p.ca) cake = coutProduit(p) / p.ca;
+      if (p.n === "COOKIE" && p.ca) cookie = coutProduit(p) / p.ca;
     });
     $("pm-alerte").innerHTML =
-      "<p><b>Les deux produits Merci Mandy sont vos plus mauvaises marges : cake à " + pct(cake)
-      + " de coût matière, cookie à " + pct(cookie) + ".</b> Ce sont des prix d'achat réels, pas des "
+      "<p><b>Les deux produits Merci Mandy sont vos plus mauvaises marges : cake à " + pc(cake)
+      + " de coût matière, cookie à " + pc(cookie) + ".</b> Ce sont des prix d'achat réels, pas des "
       + "estimations. Ce sont aussi les deux produits que vous offrez en formule, donc les plus chers "
       + "à donner. À comparer aux boissons, entre 3 et 15 %.</p>"
       + "<p><b>Ce que coûte un produit offert est déjà compté.</b> Le coût part des quantités passées en "
@@ -2194,7 +2537,7 @@ demarrerEnClair();
     f.v.forEach(function (o) {
       var sale = coutRecette(o[0]), complet = sale + mB + mD;
       total += complet * o[1];
-      ligne(tb, [REC[o[0]].n, o[1], eur(sale, 2), eur(mB, 2), eur(mD, 2), eur(complet, 2),
+      ligne(tb, [REC[o[0]].n, qte(o[1]), eur(sale, 2), eur(mB, 2), eur(mD, 2), eur(complet, 2),
         { t: pct(1 - complet / prixU), couleur: "var(--vert)" }]);
     });
     var moyen = total / f.q, saleMoyen = coutProduit(f) / f.q;
@@ -2213,7 +2556,8 @@ demarrerEnClair();
       + " encaissés, soit " + pct(moyen / prixU) + " de coût matière et " + eur(prixU - moyen, 2)
       + " de marge brute.</b> Le salé seul en représente " + pct(saleMoyen / prixU)
       + " : la boisson et le dessert offerts ajoutent " + eur(mB + mD, 2) + ". Sur les " + f.q
-      + " formules d'août, cela fait " + eur(total) + " de matière et " + eur(f.ca - total) + " de marge.</p>"
+      + " formules " + deMois(E.mois) + (estPartiel(E.mois) ? " (" + PARTIEL[E.mois].jours + " premiers jours)" : "")
+      + ", cela fait " + eur(total) + " de matière et " + eur(f.ca - total) + " de marge.</p>"
       + "<p>Ce n'est pas la boisson qui coûte, c'est le dessert : " + eur(mB, 2) + " contre "
       + eur(mD, 2) + ". Offrir un café ne vous coûte presque rien ; offrir une part de cake, "
       + Math.round(mD / mB) + " fois plus.</p>";
@@ -2242,6 +2586,36 @@ demarrerEnClair();
     });
   }
 
+  /* Le mois en cours face au point mort. Le point mort est recalculé au mix
+     de ce mois-là, avec les hypothèses à l'écran : c'est la seule comparaison
+     honnête, le coût matière dépendant de ce qui a été vendu. */
+  function dessinerEnCours() {
+    var n = $("p-encours");
+    if (!EN_COURS) { n.hidden = true; $("p-pied-encours").textContent = ""; return; }
+    var P = PARTIEL[EN_COURS], ca = caDuMois(EN_COURS), proj = projection(EN_COURS);
+    /* Même point mort que le reste de la page (mix du mois de référence), et,
+       pour mémoire, celui qu'on obtient au mix du mois en cours. */
+    var pm = pointMort(E);
+    var pmM = auMix(EN_COURS, function () { return pointMort(E); });
+    n.hidden = false;
+    if (pm.ca === null) { n.textContent = "Mois en cours : pas de point mort atteignable avec ces hypothèses."; return; }
+    var ecart = proj - pm.ca;
+    n.innerHTML = "<p><b>" + majuscule(moisLong(EN_COURS)) + ", mois en cours : " + P.jours + " jours sur "
+      + P.jours_mois + ".</b> " + eur(ca) + " encaissés, soit " + eur(ca / P.jours) + " par jour, contre "
+      + eur(pm.ca / P.jours_mois) + " par jour pour atteindre le point mort sur un mois de " + P.jours_mois + " jours.</p>"
+      + "<p>Projeté sur le mois entier : <b>" + eur(proj) + ", " + (ecart >= 0 ? "au-dessus" : "en dessous")
+      + " du point mort de " + eur(Math.abs(ecart)) + "</b>. C'est une projection faite sur " + P.jours
+      + " jours, pas un réalisé : elle suppose que la fin du mois ressemble à son début."
+      + (pmM.ca !== null && E.mois !== EN_COURS ? " Au mix de vente " + deMoisLong(EN_COURS) + ", le point mort serait de "
+        + eur(pmM.ca) + " au lieu de " + eur(pm.ca) + "." : "") + "</p>";
+    var rel = new Date(P.releve), j1 = +P.du.slice(8);
+    $("p-pied-encours").textContent = majuscule(moisLong(EN_COURS)) + " : ventes par article du "
+      + (j1 === 1 ? "1er" : j1) + " au " + (+P.au.slice(8)) + ", relevées dans Square"
+      + (isNaN(rel) ? "" : " le " + rel.toLocaleDateString("fr-FR")) + " avec les mêmes mesures que les mois clos ; "
+      + "mois incomplet, projeté au prorata des jours.";
+  }
+  function deMoisLong(m) { var l = moisLong(m); return (/^[aeiou]/i.test(l) ? "d'" : "de ") + l; }
+
   function rendre() {
     var cm = coutMatiere(E.suppose);
     var r = compte(E, E.ca);
@@ -2261,9 +2635,12 @@ demarrerEnClair();
     else {
       v.textContent = (ecart >= 0 ? "Au-dessus du point mort de " : "Sous le point mort de ")
         + eur(Math.abs(ecart)) + " par mois";
+      /* Sur douze mois, c'est l'EBITDA qui s'accumule, pas l'écart de CA : chaque
+         euro manquant ne coûte que sa marge sur coûts variables. */
       vn.textContent = "Il faut " + eur(pm.ca) + " de CA mensuel pour couvrir matières, équipe et charges fixes. "
-        + "Vous en êtes à " + eur(E.ca) + ", soit " + eur(Math.abs(ecart) * 12)
-        + (ecart >= 0 ? " d'EBITDA sur douze mois." : " de perte d'exploitation sur douze mois à ce rythme.");
+        + "Vous en êtes à " + eur(E.ca) + (estPartiel(E.mois) ? " (projection " + deMois(E.mois) + ")" : "")
+        + ", soit " + eur(Math.abs(r.ebitda) * 12)
+        + (r.ebitda >= 0 ? " d'EBITDA sur douze mois." : " de perte d'exploitation sur douze mois à ce rythme.");
     }
 
     $("m-mb").textContent = pct(r.mbPct);
@@ -2272,36 +2649,152 @@ demarrerEnClair();
     $("m-ebitda").style.color = r.ebitda >= 0 ? "var(--vert)" : "var(--rouge)";
     $("m-ebitda-det").textContent = pct(r.ca ? r.ebitda / r.ca : 0) + " du CA, soit " + eur(r.ebitda * 12) + " par an.";
     $("m-pm").textContent = pm.ca === null ? "—" : eur(pm.ca);
-    /* Le shop ouvre tous les jours : 30,44 jours par mois en moyenne. */
+    /* Le shop ouvre tous les jours : 30,44 jours par mois en moyenne. Les CA
+       par jour viennent tous deux des ventes par article, même source. */
+    var clos = MOIS_CLOS[MOIS_CLOS.length - 1];
     $("m-pm-det").textContent = pm.ca === null ? "hors d'atteinte"
-      : eur(pm.ca / 30.44) + " par jour, ouvert tous les jours. Août a fait " + eur(19305 / 31) + ".";
-    $("ca-aide").textContent = "Mois de référence : " + libelleMois(E.mois) + ", "
-      + eur(caDuMois(E.mois)) + " encaissés.";
+      : eur(pm.ca / 30.44) + " par jour, ouvert tous les jours. " + majuscule(NOM_MOIS[+clos.slice(5, 7) - 1]) + " a fait "
+        + eur(caDuMois(clos) / joursDansMois(clos)) + " par jour"
+        + (EN_COURS ? ", " + NOM_MOIS[+EN_COURS.slice(5, 7) - 1] + " en cours " + eur(caDuMois(EN_COURS) / PARTIEL[EN_COURS].jours) : "") + ".";
+    var PM = PARTIEL[E.mois];
+    $("ca-aide").textContent = PM
+      ? "Mois de référence : " + libelleMois(E.mois) + ", en cours — " + eur(caDuMois(E.mois)) + " encaissés en "
+        + PM.jours + " jours sur " + PM.jours_mois + " (" + eur(caDuMois(E.mois) / PM.jours) + " par jour). "
+        + "Le CA de départ est la projection sur le mois entier, " + eur(projection(E.mois)) + " : une projection, pas un réalisé."
+      : "Mois de référence : " + libelleMois(E.mois) + ", " + eur(caDuMois(E.mois)) + " encaissés.";
     /* L'en-tête replié porte le chiffre de la section, comme les huit autres. */
     var sv = $("sv-pointmort");
     if (sv) sv.innerHTML = "point mort <b>" + eur(pm.ca === null ? 0 : pm.ca) + "</b> · marge "
       + pct(r.mbPct) + " · <span class='" + (r.ebitda >= 0 ? "" : "crit") + "'>EBITDA "
-      + eur(r.ebitda) + "</span>";
+      + eur(r.ebitda) + "</span>"
+      + (EN_COURS ? " · " + NOM_MOIS[+EN_COURS.slice(5, 7) - 1] + " projeté " + eur(projection(EN_COURS)) : "");
 
     dessinerCouverture(cm);
+    dessinerEnCours();
     dessinerFormule();
     dessinerJauge(r, pm);
     dessinerCascade(r);
     dessinerTables(cm);
     dessinerMarges();
     dessinerScenarios(pm);
-    sauver();
+    barre();
   }
 
-  function sauver() {
-    try { localStorage.setItem("terrah-point-mort-v4", JSON.stringify(E)); } catch (e) { /* navigation privée */ }
+  /* ------------------------------------------------- hypothèses partagées
+     E, c'est l'écran : ce qu'on essaie. SAUVE, c'est ce que dit
+     hypotheses.json. Tant que les deux diffèrent, la barre le dit, et rien ne
+     part tant qu'on n'a pas appuyé sur « Enregistrer ». Le mois de référence
+     et le CA ne s'enregistrent pas : ce sont des curseurs d'exploration. */
+  var SAUVE = null, LU = false;
+  function echap(s) {
+    return String(s).replace(/[&<>"]/g, function (c) { return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]; });
   }
-  function charger() {
-    try {
-      var o = JSON.parse(localStorage.getItem("terrah-point-mort-v4"));
-      if (o && o.equipe && o.fixes && o.prix && o.mois && MOIS[o.mois]) return o;
-    } catch (e) { /* stockage refusé ou illisible */ }
-    return null;
+  function positif(v) { return typeof v === "number" && isFinite(v) && v >= 0; }
+  function listeValide(l) {
+    return Array.isArray(l) && l.every(function (o) { return o && typeof o.nom === "string" && positif(+o.v); });
+  }
+  function etatDepuis(doc) {
+    var e = copier(DEFAUT);
+    if (!doc) return e;
+    ["provision", "commission", "suppose"].forEach(function (k) { if (positif(doc[k])) e[k] = doc[k]; });
+    if (listeValide(doc.equipe)) e.equipe = doc.equipe.map(function (o) { return { nom:o.nom, v:+o.v }; });
+    if (listeValide(doc.fixes)) e.fixes = doc.fixes.map(function (o) { return { nom:o.nom, v:+o.v }; });
+    if (doc.prix && typeof doc.prix === "object")
+      for (var c in doc.prix) if (ING[c] && positif(doc.prix[c])) e.prix[c] = doc.prix[c];
+    return e;
+  }
+  /* Ce qui part dans le fichier. Les prix n'y figurent que lorsqu'ils
+     s'écartent de la facture : le fichier reste lisible, et une nouvelle
+     facture intégrée au référentiel n'est pas masquée par un vieux prix. */
+  function aEnregistrer(e) {
+    var p = {};
+    for (var c in ING) if (e.prix[c] !== undefined && Math.abs(e.prix[c] - ING[c].p) > 1e-12) p[c] = e.prix[c];
+    var l = function (x) { return x.map(function (o) { return { nom:o.nom, v:+o.v }; }); };
+    return { provision:e.provision, commission:e.commission, suppose:e.suppose,
+             equipe:l(e.equipe), fixes:l(e.fixes), prix:p };
+  }
+  PARTAGE.baseSimulateur = function () { return aEnregistrer(SAUVE || etatDepuis(PARTAGE.doc)); };
+
+  function nombreFr(v, d) { return (+v).toFixed(d).replace(".", ",").replace(/,?0+$/, "").replace(/,$/, ""); }
+  function prixLisible(cle, p) {
+    var k = auKilo(cle);
+    return nombreFr(p * (k ? 1000 : 1), 3) + " €/" + (k ? "kg" : ING[cle].u);
+  }
+  /* « Loyer HT 5 150 → 5 300 € » : ce qui change entre l'enregistré et l'écran. */
+  function differences(a, b) {
+    var d = [];
+    if (a.provision !== b.provision) d.push("provision " + nombreFr(a.provision, 2) + " → " + nombreFr(b.provision, 2) + " %");
+    if (a.commission !== b.commission) d.push("commission CB " + nombreFr(a.commission, 2) + " → " + nombreFr(b.commission, 2) + " %");
+    if (a.suppose !== b.suppose) d.push("coût supposé " + nombreFr(a.suppose, 2) + " → " + nombreFr(b.suppose, 2) + " %");
+    [["equipe", ""], ["fixes", ""]].forEach(function (x) {
+      var la = a[x[0]], lb = b[x[0]];
+      var va = {}, vb = {};
+      la.forEach(function (o) { va[o.nom] = o.v; });
+      lb.forEach(function (o) { vb[o.nom] = o.v; });
+      lb.forEach(function (o) {
+        if (!(o.nom in va)) d.push("+ " + o.nom + " " + eur(o.v));
+        else if (Math.round(va[o.nom] * 100) !== Math.round(o.v * 100)) d.push(o.nom + " " + eur(va[o.nom]) + " → " + eur(o.v));
+      });
+      la.forEach(function (o) { if (!(o.nom in vb)) d.push("− " + o.nom); });
+    });
+    var cles = {};
+    for (var c in a.prix) cles[c] = 1;
+    for (c in b.prix) cles[c] = 1;
+    Object.keys(cles).forEach(function (c) {
+      var pa = a.prix[c] !== undefined ? a.prix[c] : ING[c].p;
+      var pb = b.prix[c] !== undefined ? b.prix[c] : ING[c].p;
+      if (Math.abs(pa - pb) > 1e-12) d.push(ING[c].n + " " + prixLisible(c, pa).replace(/ €.*/, "") + " → " + prixLisible(c, pb));
+    });
+    return d;
+  }
+  function resumer(d) {
+    return d.length <= 8 ? d.join(" ; ") : d.slice(0, 8).join(" ; ") + " ; et " + (d.length - 8) + " autres";
+  }
+  function barre() {
+    var a = aEnregistrer(SAUVE), b = aEnregistrer(E);
+    var essai = JSON.stringify(a) !== JSON.stringify(b);
+    var d = differences(a, b);
+    if (essai && !d.length) d = ["ordre des lignes"];
+    $("p-hyp").classList.toggle("essai", essai);
+    var etat = $("p-hyp-etat");
+    if (!LU) etat.textContent = "Lecture de hypotheses.json…";
+    else if (essai) etat.innerHTML = "<b>" + d.length + " essai" + (d.length > 1 ? "s" : "") + " non enregistré"
+      + (d.length > 1 ? "s" : "") + "</b> : " + echap(resumer(d)) + ". Les chiffres ci-dessous en tiennent compte ; "
+      + "personne d'autre ne les voit tant que vous n'enregistrez pas.";
+    else if (PARTAGE.doc) etat.innerHTML = "Hypothèses partagées. Enregistrées par " + hypSignature(PARTAGE.doc);
+    else etat.innerHTML = "<b>hypotheses.json n'a pas pu être lu</b> (" + echap(PARTAGE.erreur || "?")
+      + ") : ce sont les valeurs observées. Enregistrer recréera le fichier.";
+    if ($("p-auteur").value !== PARTAGE.auteur) $("p-auteur").value = PARTAGE.auteur;
+    var s = $("p-save");
+    s.disabled = !LU || !essai || !PARTAGE.auteur.trim();
+    s.title = !essai ? "Rien à enregistrer" : !PARTAGE.auteur.trim() ? "Indiquez votre prénom" : "";
+    $("p-annuler").hidden = !essai;
+    /* Qui a modifié quoi, et quand : l'historique court tenu dans le fichier. */
+    var doc = PARTAGE.doc, h = [];
+    if (doc && Array.isArray(doc.historique)) h = doc.historique;
+    else if (doc && doc.maj) h = [{ maj:doc.maj, auteur:doc.auteur, resume:doc.resume }];
+    $("p-histo").hidden = !h.length;
+    $("p-histo-liste").innerHTML = h.map(function (x) {
+      return "<li>" + hypSignature(x) + "</li>";
+    }).join("");
+  }
+  function enregistrer() {
+    var a = aEnregistrer(SAUVE), b = aEnregistrer(E), auteur = PARTAGE.auteur.trim();
+    if (!auteur || JSON.stringify(a) === JSON.stringify(b)) return;
+    var resume = "Point mort : " + (resumer(differences(a, b)) || "ordre des lignes");
+    var msg = $("p-hyp-msg");
+    $("p-save").disabled = true; msg.className = "hypmsg"; msg.textContent = "Envoi à Make…";
+    hypEnregistrer(auteur, resume, hypDocument({ simulateur: b }, auteur, resume))
+      .then(function (rep) {
+        msg.className = "hypmsg ok";
+        msg.textContent = "Enregistré" + (/^[0-9a-f]{7,40}$/.test(rep.commit || "") ? " (commit " + rep.commit.slice(0, 7) + ")" : "")
+          + ". " + HYP_DELAI;
+      })
+      .catch(function (e) {
+        msg.className = "hypmsg err";
+        msg.textContent = "Rien n'a été enregistré : " + e.message + ". Vos essais restent à l'écran, vous pouvez réessayer.";
+        barre();
+      });
   }
   function lierNombre(id, champ) {
     var i = $(id);
@@ -2328,12 +2821,43 @@ demarrerEnClair();
     E.equipe.push({ nom: "Nouvelle personne", v: 2200 });
     batirEquipe(); rendre();
   });
+  /* Revenir à ce qu'observent les factures et la paie d'août : un essai comme
+     un autre, tant qu'il n'est pas enregistré. */
   $("p-reset").addEventListener("click", function () { demarrer(copier(DEFAUT)); });
+  /* Revenir à ce que dit le fichier, sans toucher au mois ni au CA explorés. */
+  $("p-annuler").addEventListener("click", function () {
+    var e = etatDepuis(PARTAGE.doc); e.mois = E.mois; e.ca = E.ca;
+    $("p-hyp-msg").textContent = ""; $("p-hyp-msg").className = "hypmsg";
+    demarrer(e);
+  });
+  $("p-save").addEventListener("click", enregistrer);
+  /* La jauge place ses étiquettes selon sa largeur réelle : on la redessine
+     quand la section s'ouvre et quand la fenêtre change de taille. */
+  var sec = document.getElementById("sec-pointmort"), attente = null;
+  if (sec) sec.addEventListener("toggle", function () { if (sec.open) rendre(); });
+  window.addEventListener("resize", function () {
+    clearTimeout(attente); attente = setTimeout(function () { if (!sec || sec.open) rendre(); }, 150);
+  });
+  $("p-auteur").addEventListener("input", function () {
+    PARTAGE.auteur = $("p-auteur").value;
+    document.dispatchEvent(new CustomEvent("hyp-auteur"));
+  });
+  document.addEventListener("hyp-auteur", function () { if (E) barre(); });
+  PARTAGE.surChangement(function (doc) { SAUVE = etatDepuis(doc); barre(); });
 
   dessinerSpark();
-  demarrer(charger() || copier(DEFAUT));
+  SAUVE = copier(DEFAUT);
+  demarrer(copier(DEFAUT));
   brancherOnglets("g", "act");
   brancherOnglets("d", "form");
+  /* Les hypothèses enregistrées arrivent un instant après : si personne n'a
+     encore touché à rien, elles remplacent l'écran ; sinon on garde l'essai. */
+  PARTAGE.pret.then(function (doc) {
+    var intact = JSON.stringify(aEnregistrer(E)) === JSON.stringify(aEnregistrer(SAUVE));
+    SAUVE = etatDepuis(doc); LU = true;
+    if (intact) { var e = etatDepuis(doc); e.mois = E.mois; e.ca = E.ca; demarrer(e); }
+    else barre();
+  });
 })();
 
 </script>
