@@ -104,6 +104,22 @@ body{background:var(--ground); color:var(--ink);
 #msg{font-size:13px; padding:10px 14px; border-radius:4px; display:none}
 #msg.ok{display:block; background:var(--green-soft); color:var(--green); border-left:3px solid var(--green)}
 #msg.err{display:block; background:var(--crit-soft); color:var(--crit); border-left:3px solid var(--crit)}
+/* ---- impayés : liste complète, factures dépliables ---- */
+.imptete{display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap}
+.imptete h3{margin:0}
+button.deplier{background:none; border:none; padding:0; margin:0; font:inherit; font-weight:500; color:var(--ink);
+  cursor:pointer; text-align:left; display:inline-flex; gap:7px; align-items:baseline}
+button.deplier::before{content:"▸"; color:var(--mut); display:inline-block; transition:transform .15s ease}
+button.deplier[aria-expanded="true"]::before{transform:rotate(90deg); color:var(--roast)}
+button.deplier:hover{color:var(--roast)}
+button.deplier:focus-visible{outline:2px solid var(--roast); outline-offset:2px; border-radius:2px}
+tr.impdet > td{background:var(--raise); padding:6px 12px 12px 30px}
+table.imptab{min-width:0; font-size:12.5px}
+table.imptab th{background:transparent; padding:6px 10px}
+table.imptab td{padding:5px 10px}
+table.imptab td.num{font-family:"IBM Plex Mono",monospace; font-weight:500; white-space:nowrap}
+table.imptab .sub{color:var(--mut); font-size:11.5px}
+.impanom summary{cursor:pointer; font-size:13px; color:var(--ink-2); margin-bottom:8px}
 /* ---- hypothèses partagées : lire, essayer, enregistrer ---- */
 .hypbar{background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--green);
   border-radius:0 4px 4px 0; padding:11px 14px; display:flex; flex-direction:column; gap:8px; font-size:13px}
@@ -467,14 +483,24 @@ a{color:var(--roast)}
     <div><div class="bnum" id="imp30">—</div><div class="eyebrow" id="imp30n"></div></div>
     <p id="imptxt"></p>
   </div>
-  <div class="duo">
-    <div class="tbl"><table>
-      <thead><tr><th>Ancienneté</th><th class="n">Factures</th><th class="n">Montant HT</th></tr></thead>
-      <tbody id="impbuck"></tbody></table></div>
-    <div class="tbl"><table>
-      <thead><tr><th>À relancer, par client (&gt; 30 j)</th><th class="n">HT dû</th><th class="n">Factures</th><th class="n">Plus ancienne</th></tr></thead>
-      <tbody id="imptop"></tbody></table></div>
-  </div></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Ancienneté</th><th class="n">Factures</th><th class="n">Montant HT</th><th class="n">Reste dû TTC</th></tr></thead>
+    <tbody id="impbuck"></tbody></table></div>
+  <div class="imptete">
+    <h3 class="mini">Tous les clients avec un impayé <span class="eyebrow" id="impcompte"></span></h3>
+    <p class="sublabel" style="flex-basis:100%; order:3">Cliquez sur un client pour voir chacune de ses factures dues.</p>
+    <button type="button" class="linkbtn" id="imp-tout" aria-expanded="false">Tout déplier</button>
+  </div>
+  <div class="tbl"><table class="impliste">
+    <thead><tr><th>Client</th><th class="n">Factures</th><th class="n">Montant HT</th>
+      <th class="n">Reste dû TTC</th><th class="n">Plus ancienne</th></tr></thead>
+    <tbody id="imptop"></tbody></table></div>
+  <p class="sublabel" id="impnote"></p>
+  <details class="impanom" id="impanom" hidden><summary id="impanom-titre"></summary>
+    <div class="tbl"><table class="imptab"><thead><tr><th>Client</th><th>N° facture</th><th>Date</th>
+      <th class="n">HT</th><th class="n">Reste dû TTC</th><th>Ce que c'est</th></tr></thead>
+      <tbody id="impanom-liste"></tbody></table></div>
+  </details></div>
 </details>
 
 <details class="sec" id="sec-b2b">
@@ -597,7 +623,9 @@ a{color:var(--roast)}
       <li><b>Square</b> — CA net hors taxes, un passage = un ticket, relevé jour par jour, ce qui
       permet les trois granularités. Figé à la date de génération.</li>
       <li><b>Clients actifs, relances et impayés</b> — calculés à la date de la dernière facture
-      présente dans l'export, pas à la date du jour. Ils ne dépendent pas de la période choisie.</li>
+      présente dans l'export, pas à la date du jour. Ils ne dépendent pas de la période choisie.
+      Les impayés sont la liste des factures non réglées d'Axonaut, publiée par Make avec leur numéro
+      et leur reste dû TTC : un paiement partiel est déduit, une facture d'avant l'historique y figure.</li>
       <li><b>Rythme de commande</b> — médiane des intervalles entre commandes, clients de moins de
       3 commandes exclus. Seuils repris de la page farming : 0,86× à relancer, 1× risque de churn,
       3× considéré comme perdu.</li>
@@ -1212,6 +1240,56 @@ function mixFor(k) {
   return vu ? t : null;
 }
 
+/* ---------------------------------------------- impayés : liste et dépliage
+   dettes : ce qui est dû (reste > 0). autres : avoirs non imputés et restes
+   négatifs, montrés à part. L'état déplié vit en mémoire, le temps de la
+   visite, et survit aux changements de période. */
+let IMP_OUVERTS = new Set();
+let IMP_CLIENTS = [];
+function impayesListe(CS) {
+  const det = DATA.impDet || [];
+  if (det.length) {
+    const dettes = [], autres = [];
+    for (const o of det) (o.reste > 0.005 ? dettes : autres).push(Object.assign({}, o));
+    return { source: "axonaut", dettes, autres };
+  }
+  const dettes = [], autres = [], vus = new Set();
+  CS.inv.forEach((o, k) => {
+    vus.add(String(FACTURES[k]));
+    if (o.paid !== IMPAYE) return;
+    const x = { f: String(FACTURES[k]), n: "", c: CLIENTS[o.c], d: o.d >= 0 ? o.d : null, e: null, ht: o.ht, ttc: 0, reste: o.ht };
+    (o.ht > 0 ? dettes : autres).push(x);
+  });
+  for (const f of DATA.impIds || [])
+    if (!vus.has(String(f))) dettes.push({ f: String(f), n: "", c: "Client inconnu", d: null, e: null, ht: 0, ttc: 0, reste: 0, horsHisto: true });
+  return { source: "lignes", dettes, autres };
+}
+function majToutDeplier() {
+  const b = $("imp-tout");
+  const tous = IMP_CLIENTS.length > 0 && IMP_CLIENTS.every((c) => IMP_OUVERTS.has(c));
+  b.textContent = tous ? "Tout replier" : "Tout déplier";
+  b.setAttribute("aria-expanded", tous ? "true" : "false");
+  b.hidden = !IMP_CLIENTS.length;
+}
+$("imptop").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button.deplier");
+  if (!b) return;
+  const ouvrir = b.getAttribute("aria-expanded") !== "true";
+  b.setAttribute("aria-expanded", ouvrir ? "true" : "false");
+  $(b.getAttribute("aria-controls")).hidden = !ouvrir;
+  if (ouvrir) IMP_OUVERTS.add(b.dataset.client); else IMP_OUVERTS.delete(b.dataset.client);
+  majToutDeplier();
+});
+$("imp-tout").addEventListener("click", () => {
+  const ouvrir = $("imp-tout").getAttribute("aria-expanded") !== "true";
+  IMP_OUVERTS = new Set(ouvrir ? IMP_CLIENTS : []);
+  document.querySelectorAll("#imptop button.deplier").forEach((b) => {
+    b.setAttribute("aria-expanded", ouvrir ? "true" : "false");
+    $(b.getAttribute("aria-controls")).hidden = !ouvrir;
+  });
+  majToutDeplier();
+});
+
 /* ------------------------------------------------------- clients & impayés */
 function clientStats() {
   const last = new Map(), first = new Map(), dates = new Map(), inv = new Map();
@@ -1551,44 +1629,94 @@ function render() {
     DATA.pipeline.cafeAOffrir + "&nbsp;kg à déposer. Le suivi client détaillé reste sur la " +
     "<a href='https://allterrahpro-collab.github.io/farmingterrah/'>page farming</a>.";
 
-  /* ---- impayés ---- */
-  const buck = [["0-30j", 0, 0], ["31-60j", 0, 0], ["61-90j", 0, 0], ["91-180j", 0, 0], [">180j", 0, 0]];
-  const unpaid = [];
-  CS.inv.forEach((o) => {
-    if (o.paid !== IMPAYE || o.ht <= 0) return;
-    const age = asOf - o.d;
-    const b = age <= 30 ? 0 : age <= 60 ? 1 : age <= 90 ? 2 : age <= 180 ? 3 : 4;
-    buck[b][1]++; buck[b][2] += o.ht;
-    if (age > 30) unpaid.push({ c: o.c, ht: o.ht, age, d: o.d });
-  });
-  const s30 = buck.slice(1).reduce((s, b) => s + b[2], 0), n30 = buck.slice(1).reduce((s, b) => s + b[1], 0);
+  /* ---- impayés ----
+     Tous les clients, toutes les factures. La liste d'Axonaut fait autorité
+     (numéro, reste dû TTC, factures d'avant l'historique comprises). Avec un
+     data.json plus ancien, sans ce détail, on retombe sur les lignes de
+     factures, et un impayé absent des lignes est listé sous son identifiant. */
+  const L = impayesListe(CS);
+  const avecReste = L.source === "axonaut";
+  const du = (o) => (avecReste ? o.reste : o.ht);
+  const buck = [["0-30j", 0, 0, 0], ["31-60j", 0, 0, 0], ["61-90j", 0, 0, 0], ["91-180j", 0, 0, 0], [">180j", 0, 0, 0]];
+  for (const o of L.dettes) {
+    o.age = o.d !== null ? asOf - o.d : null;
+    const b = o.age === null ? 4 : o.age <= 30 ? 0 : o.age <= 60 ? 1 : o.age <= 90 ? 2 : o.age <= 180 ? 3 : 4;
+    buck[b][1]++; buck[b][2] += o.ht; buck[b][3] += du(o);
+  }
+  const s30 = buck.slice(1).reduce((s, b) => s + b[3], 0), n30 = buck.slice(1).reduce((s, b) => s + b[1], 0);
   const delays = [];
   CS.inv.forEach((o) => { if (o.paid >= 0) delays.push(o.paid - o.d); });
   $("imp30").textContent = eur(s30);
-  $("imp30n").textContent = n30 + " factures au-delà de 30 jours";
+  $("imp30n").textContent = n30 + " factures au-delà de 30 jours · " + (avecReste ? "reste dû TTC" : "montant HT");
   $("imptxt").innerHTML = "Le délai de paiement médian réel est de <b>" + (delays.length ? median(delays).toFixed(0) : "—") +
     " jours</b> : les clients paient vite. La traîne n'est donc pas un problème de délai mais un stock jamais relancé — " +
     buck[4][1] + " factures dépassent 180 jours, dont une partie est probablement du lettrage à corriger plutôt que du dû réel.";
+  const tot = buck.reduce((t, b) => [t[0] + b[1], t[1] + b[2], t[2] + b[3]], [0, 0, 0]);
   $("impbuck").innerHTML = buck.map((b) => "<tr><td>" + b[0] + "</td><td class='n'>" + b[1] +
-    "</td><td class='n'>" + eur(b[2]) + "</td></tr>").join("") +
-    "<tr><td><b>Total</b></td><td class='n'><b>" + buck.reduce((s, b) => s + b[1], 0) +
-    "</b></td><td class='n'><b>" + eur(buck.reduce((s, b) => s + b[2], 0)) + "</b></td></tr>";
+    "</td><td class='n'>" + eur(b[2]) + "</td><td class='n'>" + (avecReste ? eur(b[3]) : "—") + "</td></tr>").join("") +
+    "<tr><td><b>Total</b></td><td class='n'><b>" + tot[0] + "</b></td><td class='n'><b>" + eur(tot[1]) +
+    "</b></td><td class='n'><b>" + (avecReste ? eur(tot[2]) : "—") + "</b></td></tr>";
+
   /* Regroupé par client : une relance se passe au téléphone avec quelqu'un, pas
-     avec une facture. On additionne donc ce qu'il doit, et on retient sa plus
-     vieille facture — c'est elle qui donne le ton de l'appel. */
+     avec une facture. Chaque client se déplie sur toutes ses factures dues. */
   const parClient = new Map();
-  for (const o of unpaid) {
-    const e = parClient.get(o.c) || { c: o.c, ht: 0, n: 0, age: 0, d: o.d };
-    e.ht += o.ht; e.n++;
-    if (o.age > e.age) { e.age = o.age; e.d = o.d; }
+  for (const o of L.dettes) {
+    const e = parClient.get(o.c) || { c: o.c, ht: 0, du: 0, n: 0, d: null, fs: [] };
+    e.ht += o.ht; e.du += du(o); e.n++; e.fs.push(o);
+    if (o.d !== null && (e.d === null || o.d < e.d)) e.d = o.d;
     parClient.set(o.c, e);
   }
-  const relances = [...parClient.values()].sort((a, b) => b.ht - a.ht);
-  $("imptop").innerHTML = relances.slice(0, 12).map((o) => "<tr><td class='cl'>" + esc(CLIENTS[o.c]) +
-    "</td><td class='n'>" + eur(o.ht) + "</td><td class='n'>" + o.n +
-    "</td><td class='n'><span class='pill " + (o.age > 180 ? "crit" : "warn") + "'>" + o.age + NB + "j</span> " +
-    dayToDate(o.d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "UTC" }) +
-    "</td></tr>").join("") || "<tr><td colspan='4' class='empty'>Aucun impayé de plus de 30 jours.</td></tr>";
+  const liste = [...parClient.values()].sort((a, b) => b.du - a.du || a.c.localeCompare(b.c, "fr"));
+  IMP_CLIENTS = liste.map((e) => e.c);
+  const dateC = (d) => (d !== null && d !== undefined ? dayToDate(d).toLocaleDateString("fr-FR",
+    { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "UTC" }) : "—");
+  const pilule = (age) => (age === null ? "<span class='pill warn'>date ?</span>"
+    : "<span class='pill " + (age > 180 ? "crit" : age > 30 ? "warn" : "good") + "'>" + age + NB + "j</span>");
+  const factures = (fs) => "<table class='imptab'><thead><tr><th>N° facture</th><th>Date</th><th>Échéance</th>" +
+    "<th class='n'>Âge</th><th class='n'>HT</th><th class='n'>TTC</th><th class='n'>Reste dû</th></tr></thead><tbody>" +
+    fs.slice().sort((a, b) => (a.d === null ? 1e9 : a.d) - (b.d === null ? 1e9 : b.d)).map((o) => {
+      const partiel = avecReste && o.ttc > 0 && o.reste < o.ttc - 0.005;
+      return "<tr><td class='num'>" + (o.n ? esc(o.n) : "id Axonaut " + esc(o.f)) +
+        (o.horsHisto ? " <span class='sub'>· hors historique</span>" : "") + "</td><td>" + dateC(o.d) + "</td><td>" +
+        dateC(o.e) + "</td><td class='n'>" + pilule(o.age) + "</td><td class='n'>" + eur(o.ht, 2) + "</td><td class='n'>" +
+        (avecReste ? eur(o.ttc, 2) : "—") + "</td><td class='n'><b>" + (avecReste ? eur(o.reste, 2) : "—") + "</b>" +
+        (partiel ? "<br><span class='sub'>" + eur(o.ttc - o.reste, 2) + " déjà réglés</span>" : "") + "</td></tr>";
+    }).join("") + "</tbody></table>";
+  $("imptop").innerHTML = liste.map((e, i) => {
+    const ouvert = IMP_OUVERTS.has(e.c), id = "impdet-" + i;
+    return "<tr><td class='cl'><button type=\"button\" class=\"deplier\" data-client=\"" + esc(e.c) + "\" aria-expanded=\"" + ouvert +
+      "\" aria-controls=\"" + id + "\">" + esc(e.c) + "</button></td><td class='n'>" + e.n + "</td><td class='n'>" + eur(e.ht) +
+      "</td><td class='n'><b>" + (avecReste ? eur(e.du) : "—") + "</b></td><td class='n'>" +
+      pilule(e.d !== null ? asOf - e.d : null) + " " + dateC(e.d) + "</td></tr>" +
+      "<tr class='impdet' id='" + id + "'" + (ouvert ? "" : " hidden") + "><td colspan='5'>" + factures(e.fs) + "</td></tr>";
+  }).join("") || "<tr><td colspan='5' class='empty'>Aucune facture impayée.</td></tr>";
+  $("impcompte").textContent = liste.length + " clients · " + L.dettes.length + " factures";
+  majToutDeplier();
+
+  const etat = DATA.genere ? new Date(DATA.genere).toLocaleDateString("fr-FR") : "?";
+  const partiels = L.dettes.filter((o) => avecReste && o.ttc > 0 && o.reste < o.ttc - 0.005).length;
+  const horsHisto = L.dettes.filter((o) => o.horsHisto).length;
+  $("impnote").innerHTML = avecReste
+    ? "Liste complète des factures non réglées selon Axonaut, état au <b>" + etat + "</b> (publication Make du lundi, " +
+      "ou lancement manuel). Montants dus : reste dû TTC" + (partiels ? " — " + partiels + " facture" +
+      (partiels > 1 ? "s partiellement réglées" : " partiellement réglée") + ", seul le reste est compté" : "") +
+      ". L'âge se compte depuis la date de facture, au " + CACHE.asOfDate.toLocaleDateString("fr-FR", { timeZone: "UTC" }) + "."
+    : "Données d'avant le détail Axonaut : montants HT, sans les paiements partiels. " +
+      (horsHisto ? horsHisto + " facture" + (horsHisto > 1 ? "s" : "") + " impayée" + (horsHisto > 1 ? "s" : "") +
+        " n'apparai" + (horsHisto > 1 ? "ssent" : "t") + " pas dans l'historique : listée" + (horsHisto > 1 ? "s" : "") +
+        " sous « Client inconnu », sans montant. " : "") +
+      "Le prochain rafraîchissement Make apportera numéros et reste dû.";
+  /* Ce qui n'est pas une dette mais mérite un coup d'œil dans Axonaut */
+  $("impanom").hidden = !L.autres.length;
+  if (L.autres.length) {
+    const somme = L.autres.reduce((s, o) => s + du(o), 0);
+    $("impanom-titre").textContent = L.autres.length + " avoir" + (L.autres.length > 1 ? "s" : "") +
+      " et anomalie" + (L.autres.length > 1 ? "s" : "") + " non comptés comme dettes (" + eur(somme) + ")";
+    $("impanom-liste").innerHTML = L.autres.slice().sort((a, b) => du(a) - du(b)).map((o) =>
+      "<tr><td>" + esc(o.c) + "</td><td class='num'>" + (o.n ? esc(o.n) : "id " + esc(o.f)) + "</td><td>" + dateC(o.d) +
+      "</td><td class='n'>" + eur(o.ht, 2) + "</td><td class='n'>" + (avecReste ? eur(o.reste, 2) : "—") + "</td><td>" +
+      (o.ht < 0 ? "avoir pas encore imputé" : "reste dû négatif : paiement sans doute mal lettré, à vérifier") + "</td></tr>").join("");
+  }
 
   /* ---- coffeeshop ---- */
   const panier = cur.sqTk ? cur.sqCa / cur.sqTk : 0;
@@ -1810,6 +1938,20 @@ function adopterBrut(brut) {
   const impayes = Array.isArray(brut.impayes)
     ? new Set(brut.impayes.map((o) => String(o && typeof o === "object" ? o.f : o)))
     : null;
+  /* Depuis le 10/09/2026, Make publie chaque impayé avec son numéro, son client,
+     ses dates et son reste dû TTC. On garde ce détail : c'est lui qui fait la
+     liste, y compris les factures antérieures à l'historique des lignes. */
+  /* jour() rend -1 pour « illisible », ce qui est aussi le 31/12/2024 : pour
+     les impayés, qui remontent avant 2025, une date illisible vaut null. */
+  const jourSur = (v) => (/^(\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4})/.test(String(v || "").trim()) ? jour(v) : null);
+  const impDet = Array.isArray(brut.impayes)
+    ? brut.impayes.filter((o) => o && typeof o === "object" && (o.n !== undefined || o.reste !== undefined))
+        .map((o) => ({
+          f: String(o.f), n: String(o.n || ""), c: String(o.c || "").trim() || "(client sans nom)",
+          d: jourSur(o.d), e: jourSur(o.e), ht: +o.ht || 0, ttc: +o.ttc || 0,
+          reste: (o.reste === undefined || o.reste === null || o.reste === "") ? (+o.ttc || 0) : +o.reste,
+        }))
+    : [];
   const etatPaiement = (l, f) => {
     const d = jour(l.pay);
     if (!impayes) return d;
@@ -1879,6 +2021,7 @@ function adopterBrut(brut) {
        pas dans `statique` : sans cette ligne le tableau du mix reste vide */
     sqcatMois: brut.sqcatMois || {},
     produits: refProd, naturesProduits: refNature,
+    impDet, impIds: impayes ? [...impayes] : [],
     aClasser: [...inconnus.entries()].map(([p, e]) => [p, e.n, e.ht])
       .sort((a, b) => Math.abs(b[2]) - Math.abs(a[2])),
   });
