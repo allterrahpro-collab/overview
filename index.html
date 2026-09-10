@@ -107,6 +107,10 @@ body{background:var(--ground); color:var(--ink);
 /* ---- impayés : liste complète, factures dépliables ---- */
 .imptete{display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap}
 .imptete h3{margin:0}
+.imptete .seg button{padding:6px 12px; font-size:11px}
+.imptete .seg button:disabled{opacity:.4; cursor:default}
+.imptete .seg{margin-left:auto}
+.imptete .linkbtn{white-space:nowrap}
 button.deplier{background:none; border:none; padding:0; margin:0; font:inherit; font-weight:500; color:var(--ink);
   cursor:pointer; text-align:left; display:inline-flex; gap:7px; align-items:baseline}
 button.deplier::before{content:"▸"; color:var(--mut); display:inline-block; transition:transform .15s ease}
@@ -487,7 +491,11 @@ a{color:var(--roast)}
     <thead><tr><th>Ancienneté</th><th class="n">Factures</th><th class="n">Montant HT</th><th class="n">Reste dû TTC</th></tr></thead>
     <tbody id="impbuck"></tbody></table></div>
   <div class="imptete">
-    <h3 class="mini">Tous les clients avec un impayé <span class="eyebrow" id="impcompte"></span></h3>
+    <h3 class="mini" id="imptitre">Tous les clients avec un impayé <span class="eyebrow" id="impcompte"></span></h3>
+    <div class="seg" role="group" aria-label="Quels clients afficher" id="imp-filtre">
+      <button type="button" id="imp-f-tous" aria-pressed="true">Tous</button>
+      <button type="button" id="imp-f-echus" aria-pressed="false">Échéance dépassée</button>
+    </div>
     <p class="sublabel" style="flex-basis:100%; order:3">Cliquez sur un client pour voir chacune de ses factures dues.</p>
     <button type="button" class="linkbtn" id="imp-tout" aria-expanded="false">Tout déplier</button>
   </div>
@@ -1245,6 +1253,8 @@ function mixFor(k) {
    négatifs, montrés à part. L'état déplié vit en mémoire, le temps de la
    visite, et survit aux changements de période. */
 let IMP_OUVERTS = new Set();
+/* Filtre « échéance dépassée » : en mémoire, le temps de la visite. */
+let IMP_ECHUS = false;
 let IMP_CLIENTS = [];
 function impayesListe(CS) {
   const det = DATA.impDet || [];
@@ -1280,6 +1290,8 @@ $("imptop").addEventListener("click", (ev) => {
   if (ouvrir) IMP_OUVERTS.add(b.dataset.client); else IMP_OUVERTS.delete(b.dataset.client);
   majToutDeplier();
 });
+for (const [id, v] of [["imp-f-tous", false], ["imp-f-echus", true]])
+  $(id).addEventListener("click", () => { if (IMP_ECHUS !== v) { IMP_ECHUS = v; render(); } });
 $("imp-tout").addEventListener("click", () => {
   const ouvrir = $("imp-tout").getAttribute("aria-expanded") !== "true";
   IMP_OUVERTS = new Set(ouvrir ? IMP_CLIENTS : []);
@@ -1636,6 +1648,17 @@ function render() {
      factures, et un impayé absent des lignes est listé sous son identifiant. */
   const L = impayesListe(CS);
   const avecReste = L.source === "axonaut";
+  /* Retard = jours écoulés depuis l'échéance, à la date du jour : une facture
+     due le 13 est en retard le 14. Sans échéance connue (données d'avant le
+     détail Axonaut), le filtre n'est pas proposé. */
+  const auj = dateToDay(new Date());
+  for (const o of L.dettes) {
+    o.retard = o.e !== null && o.e !== undefined ? auj - o.e : null;
+    o.echu = o.retard !== null && o.retard > 0;
+  }
+  const echeances = L.dettes.some((o) => o.retard !== null);
+  if (!echeances) IMP_ECHUS = false;
+  const vues = IMP_ECHUS ? L.dettes.filter((o) => o.echu) : L.dettes;
   const du = (o) => (avecReste ? o.reste : o.ht);
   const buck = [["0-30j", 0, 0, 0], ["31-60j", 0, 0, 0], ["61-90j", 0, 0, 0], ["91-180j", 0, 0, 0], [">180j", 0, 0, 0]];
   for (const o of L.dettes) {
@@ -1660,7 +1683,7 @@ function render() {
   /* Regroupé par client : une relance se passe au téléphone avec quelqu'un, pas
      avec une facture. Chaque client se déplie sur toutes ses factures dues. */
   const parClient = new Map();
-  for (const o of L.dettes) {
+  for (const o of vues) {
     const e = parClient.get(o.c) || { c: o.c, ht: 0, du: 0, n: 0, d: null, fs: [] };
     e.ht += o.ht; e.du += du(o); e.n++; e.fs.push(o);
     if (o.d !== null && (e.d === null || o.d < e.d)) e.d = o.d;
@@ -1672,13 +1695,16 @@ function render() {
     { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "UTC" }) : "—");
   const pilule = (age) => (age === null ? "<span class='pill warn'>date ?</span>"
     : "<span class='pill " + (age > 180 ? "crit" : age > 30 ? "warn" : "good") + "'>" + age + NB + "j</span>");
+  const retard = (o) => (o.retard === null ? "—"
+    : o.retard > 0 ? "<span class='pill " + (o.retard > 60 ? "crit" : "warn") + "'>" + o.retard + NB + "j</span>"
+    : "<span class='sub'>" + (o.retard === 0 ? "échoit aujourd'hui" : "dans " + (-o.retard) + NB + "j") + "</span>");
   const factures = (fs) => "<table class='imptab'><thead><tr><th>N° facture</th><th>Date</th><th>Échéance</th>" +
-    "<th class='n'>Âge</th><th class='n'>HT</th><th class='n'>TTC</th><th class='n'>Reste dû</th></tr></thead><tbody>" +
+    "<th class='n'>Retard</th><th class='n'>Âge</th><th class='n'>HT</th><th class='n'>TTC</th><th class='n'>Reste dû</th></tr></thead><tbody>" +
     fs.slice().sort((a, b) => (a.d === null ? 1e9 : a.d) - (b.d === null ? 1e9 : b.d)).map((o) => {
       const partiel = avecReste && o.ttc > 0 && o.reste < o.ttc - 0.005;
       return "<tr><td class='num'>" + (o.n ? esc(o.n) : "id Axonaut " + esc(o.f)) +
         (o.horsHisto ? " <span class='sub'>· hors historique</span>" : "") + "</td><td>" + dateC(o.d) + "</td><td>" +
-        dateC(o.e) + "</td><td class='n'>" + pilule(o.age) + "</td><td class='n'>" + eur(o.ht, 2) + "</td><td class='n'>" +
+        dateC(o.e) + "</td><td class='n'>" + retard(o) + "</td><td class='n'>" + pilule(o.age) + "</td><td class='n'>" + eur(o.ht, 2) + "</td><td class='n'>" +
         (avecReste ? eur(o.ttc, 2) : "—") + "</td><td class='n'><b>" + (avecReste ? eur(o.reste, 2) : "—") + "</b>" +
         (partiel ? "<br><span class='sub'>" + eur(o.ttc - o.reste, 2) + " déjà réglés</span>" : "") + "</td></tr>";
     }).join("") + "</tbody></table>";
@@ -1689,8 +1715,20 @@ function render() {
       "</td><td class='n'><b>" + (avecReste ? eur(e.du) : "—") + "</b></td><td class='n'>" +
       pilule(e.d !== null ? asOf - e.d : null) + " " + dateC(e.d) + "</td></tr>" +
       "<tr class='impdet' id='" + id + "'" + (ouvert ? "" : " hidden") + "><td colspan='5'>" + factures(e.fs) + "</td></tr>";
-  }).join("") || "<tr><td colspan='5' class='empty'>Aucune facture impayée.</td></tr>";
-  $("impcompte").textContent = liste.length + " clients · " + L.dettes.length + " factures";
+  }).join("") || "<tr><td colspan='5' class='empty'>" + (IMP_ECHUS ? "Aucune facture en retard sur son échéance."
+    : "Aucune facture impayée.") + "</td></tr>";
+  const echues = L.dettes.filter((o) => o.echu);
+  const nbCl = (l) => new Set(l.map((o) => o.c)).size;
+  $("imptitre").firstChild.textContent = IMP_ECHUS ? "Clients dont l'échéance est dépassée " : "Tous les clients avec un impayé ";
+  $("impcompte").textContent = "— " + liste.length + " clients · " + vues.length + " factures" +
+    (IMP_ECHUS ? " · " + eur(vues.reduce((s, o) => s + du(o), 0)) + (avecReste ? " TTC" : " HT") + " en retard au " +
+      new Date().toLocaleDateString("fr-FR") : "");
+  $("imp-f-tous").textContent = "Tous · " + nbCl(L.dettes);
+  $("imp-f-echus").textContent = "Échéance dépassée" + (echeances ? " · " + nbCl(echues) : "");
+  $("imp-f-echus").disabled = !echeances;
+  $("imp-f-echus").title = echeances ? "" : "Les échéances arrivent avec le détail Axonaut publié par Make";
+  $("imp-f-tous").setAttribute("aria-pressed", IMP_ECHUS ? "false" : "true");
+  $("imp-f-echus").setAttribute("aria-pressed", IMP_ECHUS ? "true" : "false");
   majToutDeplier();
 
   const etat = DATA.genere ? new Date(DATA.genere).toLocaleDateString("fr-FR") : "?";
@@ -1700,7 +1738,9 @@ function render() {
     ? "Liste complète des factures non réglées selon Axonaut, état au <b>" + etat + "</b> (publication Make du lundi, " +
       "ou lancement manuel). Montants dus : reste dû TTC" + (partiels ? " — " + partiels + " facture" +
       (partiels > 1 ? "s partiellement réglées" : " partiellement réglée") + ", seul le reste est compté" : "") +
-      ". L'âge se compte depuis la date de facture, au " + CACHE.asOfDate.toLocaleDateString("fr-FR", { timeZone: "UTC" }) + "."
+      ". L'âge se compte depuis la date de facture, au " + CACHE.asOfDate.toLocaleDateString("fr-FR", { timeZone: "UTC" }) +
+      " ; le retard, depuis l'échéance, à la date du jour. Un paiement reçu après le " + etat +
+      " n'apparaîtra qu'au prochain rafraîchissement."
     : "Données d'avant le détail Axonaut : montants HT, sans les paiements partiels. " +
       (horsHisto ? horsHisto + " facture" + (horsHisto > 1 ? "s" : "") + " impayée" + (horsHisto > 1 ? "s" : "") +
         " n'apparai" + (horsHisto > 1 ? "ssent" : "t") + " pas dans l'historique : listée" + (horsHisto > 1 ? "s" : "") +
@@ -1816,8 +1856,10 @@ function renderSources() {
 }
 
 /* --------------------------------------------------------------- écouteurs */
-document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => {
-  document.querySelectorAll(".seg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+/* La granularité ne concerne que la barre de période : d'autres groupes .seg
+   existent (filtre des impayés), il ne faut pas les capter. */
+document.querySelectorAll(".periodbar .seg button").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll(".periodbar .seg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
   const old = PKEY ? pRange(PKEY)[0] : null;
   GRAN = b.dataset.g;
   if (old !== null) {
