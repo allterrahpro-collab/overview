@@ -104,6 +104,7 @@ body{background:var(--ground); color:var(--ink);
 #msg{font-size:13px; padding:10px 14px; border-radius:4px; display:none}
 #msg.ok{display:block; background:var(--green-soft); color:var(--green); border-left:3px solid var(--green)}
 #msg.err{display:block; background:var(--crit-soft); color:var(--crit); border-left:3px solid var(--crit)}
+.tbl td .sub{color:var(--mut); font-size:11.5px; font-family:"IBM Plex Sans",sans-serif}
 /* ---- bouton Rafraîchir ---- */
 .rafbar{display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; margin-top:-24px}
 .rafmsg{margin:0; font-size:12.5px; color:var(--mut); max-width:80ch}
@@ -218,6 +219,7 @@ select{font-family:"IBM Plex Mono",monospace; font-size:13px; padding:6px 10px;
 .line{fill:none; stroke:var(--ink); stroke-width:1.6; stroke-linejoin:round}
 .dot{fill:var(--surface); stroke:var(--ink); stroke-width:1.4}
 .st1{fill:var(--roast); opacity:.85} .st2{fill:var(--warn); opacity:.8} .st3{fill:var(--green); opacity:.85}
+.st1.partial,.st2.partial,.st3.partial{opacity:.45; stroke:var(--ink); stroke-dasharray:3 3; stroke-width:.8}
 .legend{display:flex; flex-wrap:wrap; gap:16px; font-size:12px; color:var(--mut);
   font-family:"IBM Plex Mono",monospace}
 .legend span{display:inline-flex; align-items:center; gap:6px}
@@ -521,8 +523,21 @@ a{color:var(--roast)}
 </details>
 
 <details class="sec" id="sec-b2b">
-  <summary class="shead"><h2>B2B</h2><span class="sub">récurrent suivi seul, ventes à part</span><span class="secval" id="sv-b2b"></span></summary>
+  <summary class="shead"><h2>B2B</h2><span class="sub">récurrent, ventes et événementiel</span><span class="secval" id="sv-b2b"></span></summary>
   <div class="secbody">
+  <div class="tiles" id="b2bflux"></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Cumul de l'année</th><th class="n" id="cumul-a"></th><th class="n" id="cumul-n1"></th>
+      <th class="n">Évolution</th><th class="n">Objectif</th></tr></thead>
+    <tbody id="b2bcumul"></tbody></table></div>
+  <div class="chart" id="chflux"></div>
+  <div class="legend">
+    <span><i class="sw" style="background:var(--roast)"></i>récurrent</span>
+    <span><i class="sw" style="background:var(--warn)"></i>ventes</span>
+    <span><i class="sw" style="background:var(--green)"></i>événementiel</span>
+  </div>
+  <p class="sublabel" id="fluxnote">Une vente de machine en leasing passe par une facture, un avoir puis une refacturation au loueur :
+  une période peut donc afficher des ventes négatives, comptées à zéro dans la barre et données telles quelles au survol.</p>
   <div class="kpis" id="b2bkpi"></div>
   <div class="chart" id="chrec"></div>
   <p class="sublabel" id="recnote"></p>
@@ -865,7 +880,7 @@ a{color:var(--roast)}
 
 <footer>
   Superbrut d'août 2026 — hors Dan et Julien, rattachés à la structure. Énergie relevée sur les factures EDF d'août (203,45 + 12,70 €).
-  Ventes et quantités Square d'août 2026, nettes de TVA, remises et offerts. Coûts unitaires issus de la feuille « Food Recipe Cost », colonne sur place.
+  Ventes et quantités Square du mois de référence, nettes de TVA, de remises et d'offerts. Coûts unitaires issus de la feuille « Food Recipe Cost », colonne sur place.
   Le modèle suppose le mix de vente constant : faire varier le CA fait varier les quantités dans les mêmes proportions.
   <span id="p-pied-encours"></span>
 </footer>
@@ -1466,6 +1481,41 @@ function svgBars(items, opts) {
   return o + "</svg>";
 }
 
+/* Barres empilées : une couleur par flux. Une part négative (une vente de
+   machine annulée par avoir d'une période sur l'autre) ne s'empile pas : elle
+   est comptée à zéro dans la barre et donnée telle quelle dans l'infobulle. */
+function svgPile(items, opts) {
+  const W = 980, H = 250, PL = 62, PR = 24, PT = 22, PB = 44;
+  const iw = W - PL - PR, ih = H - PT - PB;
+  const pos = (v) => Math.max(0, v);
+  const vmax = Math.max(1, ...items.map((it) => it.parts.reduce((s, v) => s + pos(v), 0))) * 1.15;
+  const step = iw / Math.max(items.length, 1), bw = step * 0.6;
+  let o = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + esc(opts.alt || "") + '">';
+  for (let t = 0; t <= 4; t++) {
+    const gv = vmax * t / 4, y = PT + ih - gv / vmax * ih;
+    o += '<line x1="' + PL + '" y1="' + y.toFixed(1) + '" x2="' + (PL + iw) + '" y2="' + y.toFixed(1) + '" class="grid"/>';
+    o += '<text x="' + (PL - 10) + '" y="' + (y + 4).toFixed(1) + '" class="ax ar">' +
+      (gv >= 1000 ? (gv / 1000).toFixed(gv < 10000 ? 1 : 0).replace(".", ",") + "k" : gv.toFixed(0)) + "</text>";
+  }
+  items.forEach((it, i) => {
+    const x = PL + i * step + (step - bw) / 2;
+    let base = PT + ih;
+    const tip = it.label + (it.partial ? " (en cours)" : "") + " — " +
+      it.parts.map((v, k) => opts.noms[k] + " " + eur(v)).join(", ");
+    it.parts.forEach((v, k) => {
+      const h = pos(v) / vmax * ih;
+      if (h <= 0) return;
+      base -= h;
+      o += '<rect x="' + x.toFixed(1) + '" y="' + base.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) +
+        '" class="st' + (k + 1) + (it.partial ? " partial" : "") + '"' + (it.cur ? "" : ' opacity=".7"') + "><title>" + esc(tip) + "</title></rect>";
+    });
+    if (it.partial) o += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (base - 6).toFixed(1) + '" class="ax am partialtxt">en cours</text>';
+    if (items.length <= 16 || i % 2 === 0)
+      o += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - PB + 17) + '" class="ax am">' + esc(it.short) + "</text>";
+  });
+  return o + "</svg>";
+}
+
 /* --------------------------------------------------------------- rendu */
 let CMP = { partial: false, elapsed: 0, span: 0, curLbl: "", prevLbl: "", n1Lbl: "" };
 
@@ -1660,6 +1710,56 @@ function render() {
     '<div class="kpi"><div class="k">' + rec.length + ' <span style="color:var(--mut)">/</span> ' + churn.length +
     '</div><div class="l">à relancer / en risque de churn</div></div>' +
     '<div class="kpi"><div class="k">' + DATA.pipeline.pipeline + '</div><div class="l">prospects en pipeline</div></div>';
+
+  /* KPI par flux : récurrent, ventes, événementiel. Même fenêtre que la vue
+     d'ensemble — à date quand la période est en cours — et mêmes comparaisons,
+     période précédente et N-1 sur la même durée. Les ajustements comptables
+     (soldes, avoirs isolés) restent à part : ils ne sont d'aucun flux. */
+  const FLUX = [
+    { k: "rec", code: 0, nom: "Récurrent", obj: O.b2b_recurrent_mensuel, note: "consommables, thés, locations et entretien des machines" },
+    { k: "ven", code: 1, nom: "Ventes", obj: null, note: "machines, installations, café vert, formations" },
+    { k: "evt", code: 2, nom: "Événementiel", obj: O.evenements_mensuel, note: "prestations barista, coffee corners" },
+  ];
+  const totFlux = cur.rec + cur.ven + cur.evt;
+  const compter = (lines, code) => {
+    const cl = new Set(), fa = new Set();
+    for (const a of lines) if (a[3] === code) { cl.add(a[1]); fa.add(a[5]); }
+    return [cl.size, fa.size];
+  };
+  const pl = (n, mot) => n + " " + mot + (n > 1 ? "s" : "");
+  $("b2bflux").innerHTML = FLUX.map((f) => {
+    const [ncl, nfa] = compter(cur.lines, f.code);
+    return tile(f.nom, cur[f.k], prev ? prev[f.k] : null, n1[f.k], f.obj ? f.obj * mult : null,
+      pl(ncl, "client") + " · " + pl(nfa, "facture") +
+      (totFlux > 0 ? " · " + Math.round(cur[f.k] / totFlux * 100) + " % du B2B" : "") + " — " + f.note, true, "AX");
+  }).join("");
+
+  /* Cumul de l'année, face à la même durée de l'année précédente. L'objectif
+     mensuel est ramené au nombre de jours écoulés ; celui des ventes est annuel. */
+  const joursAn = Math.max(0, ytdFin - ytd0);
+  const y1 = Math.round((Date.UTC(anneeSel - 1, 0, 1) - EPOCH) / DAY);
+  const cumA = sliceAgg(ytd0, ytd0 + joursAn), cumN1 = sliceAgg(y1, y1 + joursAn);
+  const n1Couvert = y1 >= CACHE.axMin;
+  $("cumul-a").textContent = anneeSel + " au " + (joursAn ? fmtD(ytdFin - 1) : "—");
+  $("cumul-n1").textContent = (anneeSel - 1) + " même durée";
+  const ligneCumul = (nom, a, b, obj, objTxt) =>
+    "<tr><td class='cl'>" + esc(nom) + "</td><td class='n'>" + eur(a) + "</td><td class='n'>" +
+    (n1Couvert ? eur(b) : "—") + "</td><td class='n'>" +
+    (n1Couvert ? cmpChip(a, b, "", "", true) : "—") + "</td><td class='n'>" +
+    (obj > 0 ? Math.round(a / obj * 100) + NB + "% <span class='sub'>" + esc(objTxt) + "</span>" : "—") + "</td></tr>";
+  $("b2bcumul").innerHTML =
+    ligneCumul("Récurrent", cumA.rec, cumN1.rec, O.b2b_recurrent_mensuel * joursAn / 30.44, "de l'objectif à date") +
+    ligneCumul("Ventes", cumA.ven, cumN1.ven, O.b2b_vente_annuel, "de l'objectif annuel") +
+    ligneCumul("Événementiel", cumA.evt, cumN1.evt, O.evenements_mensuel * joursAn / 30.44, "de l'objectif à date") +
+    ligneCumul("Total B2B", cumA.rec + cumA.ven + cumA.evt, cumN1.rec + cumN1.ven + cumN1.evt, 0, "");
+
+  /* Les trois flux empilés, période par période */
+  const NF = GRAN === "W" ? 16 : GRAN === "Q" ? 8 : 13;
+  const winF = keys.slice(Math.max(0, i - NF + 1), i + 1);
+  $("chflux").innerHTML = svgPile(winF.map((k) => {
+    const x = P(k);
+    return { label: pLabel(k), short: pShort(k), parts: [x.rec, x.ven, x.evt], cur: k === PKEY, partial: k === PKEY && partial };
+  }), { noms: ["récurrent", "ventes", "événementiel"], alt: "CA B2B par flux et par période" });
 
   const N = GRAN === "W" ? 16 : GRAN === "Q" ? 8 : 13;
   const win = keys.slice(Math.max(0, i - N + 1), i + 1);
@@ -1980,7 +2080,8 @@ function secResume(cur, totalPole, actifs, relance, churn, s30, n30, panier) {
   const p = (id, html) => { const el = $(id); if (el) el.innerHTML = html; };
   p("sv-ensemble", "<b>" + eur(totalPole) + "</b> HT" + (CMP.partial ? " à date" : ""));
   p("sv-impayes", "<span class='crit'>" + eur(s30) + "</span> au-delà de 30 j · " + n30 + " factures");
-  p("sv-b2b", "<b>" + eur(cur.rec) + "</b> récurrent · " + relance + "+" + churn + " à relancer");
+  p("sv-b2b", "<b>" + eur(cur.rec) + "</b> récurrent · " + eur(cur.ven) + " ventes · " + eur(cur.evt) + " évén. · " +
+    relance + "+" + churn + " à relancer");
   p("sv-shop", "<b>" + eur(cur.sqCa) + "</b> · " + cur.sqTk.toLocaleString("fr-FR") +
     " passages · " + eur(panier, 2));
   p("sv-poisso", (DATA.poisso || []).filter((x) => x.statut !== "fait").length + " chantiers en cours");
@@ -2008,6 +2109,20 @@ function boot() {
   renderSources();
   secInit();
   $("wrap").hidden = false;
+  /* Le simulateur de point mort reçoit le mois en cours et l'historique frais. */
+  if (PARTAGE.simDonnees) PARTAGE.simDonnees({ ventes: DATA.ventesMois || {}, histo: histoMensuel() });
+}
+/* CA mensuel net HT (Square) des mois clos entièrement couverts par les données. */
+function histoMensuel() {
+  if (!SQ.length) return [];
+  const par = new Map();
+  for (const s of SQ) {
+    const k = dayToDate(s[0]).toISOString().slice(0, 7);
+    par.set(k, (par.get(k) || 0) + s[1] / 100);
+  }
+  const premier = dayToDate(SQ[0][0]).toISOString().slice(0, 10);
+  const courant = String(DATA.genere || "").slice(0, 7) || new Date().toISOString().slice(0, 7);
+  return [...par.keys()].sort().filter((k) => k < courant && premier <= k + "-01").map((k) => [k, Math.round(par.get(k))]);
 }
 
 /* ------------------------------------------- chargement des données publiées
@@ -2134,6 +2249,47 @@ function adopterBrut(brut) {
   const sq = Object.entries(parJour).sort()
     .map(([d, v]) => [jour(d), Math.round(v[0] * 100), v[1]]);
 
+  /* Ventes par article recalculées depuis les tickets (champs n, q, tm, tx,
+     publiés par Make depuis le 11/09/2026) : quantités vendues et CA net de TVA,
+     de remises et d'offerts, avant retours. Ce sont les mesures du rapport
+     Square des mois clos — vérifié à l'identique, article par article, sur août
+     et sur le 1er-10 septembre. La journée du rafraîchissement, incomplète, est
+     écartée ; un mois n'est « complet » que si les tickets le couvrent en entier. */
+  const genereJour = String(brut.genere || "").slice(0, 10);
+  const parMois = {};
+  let premierJour = null;
+  for (const o of brut.squareBrut || []) {
+    const j = (o.j || "").slice(0, 10);
+    if (!j) continue;
+    if (premierJour === null || j < premierJour) premierJour = j;
+    if (o.n === undefined || (genereJour && j >= genereJour)) continue;
+    if (!o.n && !o.tm) continue;                      /* ticket sans article */
+    const noms = String(o.n).split("|"), qs = String(o.q || "").split("|");
+    const tms = String(o.tm || "").split("|"), txs = String(o.tx || "").split("|");
+    const art = (parMois[j.slice(0, 7)] = parMois[j.slice(0, 7)] || {});
+    noms.forEach((nm, i) => {
+      const e = art[nm || "(sans nom)"] || (art[nm || "(sans nom)"] = [0, 0]);
+      e[0] += +qs[i] || 0;
+      e[1] += ((+tms[i] || 0) - (+txs[i] || 0)) / 100;
+    });
+  }
+  const ventesMois = {};
+  if (genereJour && premierJour) {
+    const courant = genereJour.slice(0, 7);
+    for (const m of Object.keys(parMois)) {
+      const jm = new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7), 0)).getUTCDate();
+      const articles = {};
+      for (const [k, e] of Object.entries(parMois[m])) articles[k] = [Math.round(e[0] * 1000) / 1000, Math.round(e[1] * 100) / 100];
+      if (m < courant) {
+        if (premierJour <= m + "-01") ventesMois[m] = { articles, complet: true, jours: jm, joursMois: jm };
+      } else if (m === courant) {
+        const jours = +genereJour.slice(8, 10) - 1;
+        if (jours > 0) ventesMois[m] = { articles, complet: false, jours, joursMois: jm, du: m + "-01",
+          au: m + "-" + String(jours).padStart(2, "0"), releve: brut.genere };
+      }
+    }
+  }
+
   const plat = brut.plateformes || {};
   const shop = brut.shopify || {};
   const atl = {};
@@ -2152,7 +2308,7 @@ function adopterBrut(brut) {
        pas dans `statique` : sans cette ligne le tableau du mix reste vide */
     sqcatMois: brut.sqcatMois || {},
     produits: refProd, naturesProduits: refNature,
-    impDet, impIds: impayes ? [...impayes] : [],
+    impDet, impIds: impayes ? [...impayes] : [], ventesMois,
     aClasser: [...inconnus.entries()].map(([p, e]) => [p, e.n, e.ht])
       .sort((a, b) => Math.abs(b[2]) - Math.abs(a[2])),
   });
@@ -2192,14 +2348,24 @@ demarrerEnClair();
 (function () {
   "use strict";
 
+  /* CA mensuel Square (net HT) et repères : valeurs figées au 09/09/2026, qui
+     ne servent que le temps que data.json arrive. Dès qu'il est là, tout est
+     recalculé sur les mois réellement clos (voir simDonnees, en bas). */
   var HISTO = [["2025-09",26609],["2025-10",29466],["2025-11",28940],["2025-12",26827],
     ["2026-01",28729],["2026-02",25626],["2026-03",28325],["2026-04",24996],
     ["2026-05",24107],["2026-06",25165],["2026-07",21735],["2026-08",19305]];
-  var REPERES = [{ nom:"août 2026", ca:19305 }, { nom:"moy. 3 mois", ca:22068 },
-    { nom:"hyp. BP", ca:23000 }, { nom:"moy. 12 mois", ca:25819 }];
+  var BP_CA = 23000;   /* hypothèse de CA mensuel du BP de Julien */
+  var REPERES_BASE = [], REPERES = [];
+  function batirReperesBase() {
+    var clos = HISTO[HISTO.length - 1];
+    var moy = function (n) {
+      var s = HISTO.slice(-n);
+      return Math.round(s.reduce(function (a, h) { return a + h[1]; }, 0) / s.length);
+    };
+    REPERES_BASE = [{ nom: libelleMois(clos[0]), ca: Math.round(clos[1]) }, { nom: "moy. 3 mois", ca: moy(3) },
+      { nom: "hyp. BP", ca: BP_CA }, { nom: "moy. " + Math.min(12, HISTO.length) + " mois", ca: moy(12) }];
+  }
 
-  /* Août 2026 : n = quantité vendue, ca = ventes nettes HT, u = coût unitaire
-     issu de la recette, cout = u × q. `cout` nul = pas de recette exploitable. */
   /* Référentiel : ingrédients → recettes → ventes mensuelles.
      I    prix d'un ingrédient pour une unité de recette (g, pièce, portion)
           s = source : cost (Cost Sheet), fflow (Foodflow), mandy (Merci Mandy), est (estimation)
@@ -2241,8 +2407,23 @@ demarrerEnClair();
     var p = PARTIEL[m];
     return p ? Math.round(caDuMois(m) / p.jours * p.jours_mois) : caDuMois(m);
   }
-  var MOIS_CLOS = LISTE_MOIS.filter(function (m) { return !estPartiel(m); });
-  var EN_COURS = LISTE_MOIS.filter(estPartiel).pop() || null;
+  var MOIS_CLOS = [], EN_COURS = null;
+  /* À rappeler chaque fois que les mois changent (arrivée de data.json). */
+  function recalculerMois() {
+    LISTE_MOIS = Object.keys(MOIS).sort();
+    MOIS_CLOS = LISTE_MOIS.filter(function (m) { return !estPartiel(m); });
+    EN_COURS = LISTE_MOIS.filter(estPartiel).pop() || null;
+    batirReperesBase();
+    REPERES = REPERES_BASE.slice();
+    if (EN_COURS) REPERES.push({ nom: NOM_MOIS[+EN_COURS.slice(5, 7) - 1] + " projeté",
+      ca: projection(EN_COURS), projete: true });
+  }
+  /* Le mois de référence par défaut est le mois en cours ; le dernier mois
+     clos seulement s'il n'y a pas encore un jour complet dans le mois. */
+  function moisDefaut() { return EN_COURS || MOIS_CLOS[MOIS_CLOS.length - 1]; }
+  /* Le CA de départ : le réalisé d'un mois clos, la projection d'un mois en cours. */
+  function caDepart(m) { return estPartiel(m) ? projection(m) : caDuMois(m); }
+  var MOIS_CHOISI = false;   /* vrai dès qu'on clique un mois : on ne le change plus d'office */
   function joursDansMois(m) { return new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate(); }
   function moisCourt(m) {
     return NOM_MOIS[+m.slice(5, 7) - 1] + (estPartiel(m) ? " (" + PARTIEL[m].jours + " j)" : "");
@@ -2251,8 +2432,7 @@ demarrerEnClair();
   var NOM_LONG = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
   function moisLong(m) { return NOM_LONG[+m.slice(5, 7) - 1] + " " + m.slice(0, 4); }
   function majuscule(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
-  if (EN_COURS) REPERES.push({ nom: NOM_MOIS[+EN_COURS.slice(5, 7) - 1] + " projeté",
-    ca: Math.round(projection(EN_COURS)), projete: true });
+  recalculerMois();
   /* Calcule f() comme si le mois m était le mois de référence, puis rend la main. */
   function auMix(m, f) {
     var garde = PRODUITS;
@@ -2262,7 +2442,7 @@ demarrerEnClair();
 
 
   var DEFAUT = {
-    mois: "2026-08", ca: null, provision: 10, commission: 0.28, suppose: 30,
+    mois: null, ca: null, provision: 10, commission: 0.28, suppose: 30,   /* mois null = moisDefaut() */
     equipe: [{ nom:"Boulaye", v:1508.16 }, { nom:"Orianna", v:2437.86 },
              { nom:"Magda", v:2388.09 }, { nom:"Mathis", v:2025.93 }],
     fixes: [{ nom:"Loyer HT", v:5150 }, { nom:"Énergie (EDF)", v:216 },
@@ -2276,7 +2456,8 @@ demarrerEnClair();
   function copier(p) {
     var prix = {};
     for (var c in ING) prix[c] = ING[c].p;
-    return { mois:p.mois, ca:(p.ca === null ? caDuMois(p.mois) : p.ca),
+    var m = p.mois && MOIS[p.mois] ? p.mois : moisDefaut();
+    return { mois:m, ca:(p.ca === null ? caDepart(m) : p.ca),
       provision:p.provision, commission:p.commission, suppose:p.suppose,
       prix: prix,
       equipe:p.equipe.map(function (o) { return { nom:o.nom, v:o.v }; }),
@@ -2305,7 +2486,7 @@ demarrerEnClair();
     return t;
   }
   // Coût matière du mois : recettes pour ce qui est chiffré, taux supposé sur
-  // le reste, le tout ramené en pourcentage du CA d'août.
+  // le reste, le tout ramené en pourcentage du CA du mois de référence.
   function coutMatiere(suppose) {
     var caTotal = 0, cout = 0, caConnu = 0, coutConnu = 0;
     for (var i = 0; i < PRODUITS.length; i++) {
@@ -2481,7 +2662,8 @@ demarrerEnClair();
       }
       b.setAttribute("aria-pressed", m === E.mois ? "true" : "false");
       b.addEventListener("click", function () {
-        E.mois = m; E.ca = estPartiel(m) ? Math.round(projection(m)) : caDuMois(m);
+        MOIS_CHOISI = true;
+        E.mois = m; E.ca = caDepart(m);
         chargerMois(m);
         $("ca").value = E.ca.toFixed(0); $("ca-r").value = E.ca;
         batirMois(); rendre();
@@ -2553,8 +2735,9 @@ demarrerEnClair();
     pt.setAttribute("cy", y(vals[vals.length - 1]).toFixed(1));
     pt.setAttribute("r", "3"); pt.setAttribute("fill", "var(--rouge)");
     svg.appendChild(pt);
-    var texte = "Septembre 2025 → août 2026 : " + eur(vals[0]) + " puis "
-      + eur(vals[vals.length - 1]) + ", soit " + pct((vals[vals.length - 1] - vals[0]) / vals[0], 0) + " en douze mois.";
+    var texte = majuscule(moisLong(HISTO[0][0])) + " → " + moisLong(HISTO[HISTO.length - 1][0]) + " : " + eur(vals[0])
+      + " puis " + eur(vals[vals.length - 1]) + ", soit " + pct((vals[vals.length - 1] - vals[0]) / vals[0], 0)
+      + " en " + (vals.length - 1) + " mois.";
     if (proj !== null) {
       var suite = document.createElementNS(ns, "path");
       suite.setAttribute("d", "M" + x(vals.length - 1).toFixed(1) + " " + y(vals[vals.length - 1]).toFixed(1)
@@ -2884,9 +3067,11 @@ demarrerEnClair();
         + eur(pmM.ca) + " au lieu de " + eur(pm.ca) + "." : "") + "</p>";
     var rel = new Date(P.releve), j1 = +P.du.slice(8);
     $("p-pied-encours").textContent = majuscule(moisLong(EN_COURS)) + " : ventes par article du "
-      + (j1 === 1 ? "1er" : j1) + " au " + (+P.au.slice(8)) + ", relevées dans Square"
-      + (isNaN(rel) ? "" : " le " + rel.toLocaleDateString("fr-FR")) + " avec les mêmes mesures que les mois clos ; "
-      + "mois incomplet, projeté au prorata des jours.";
+      + (j1 === 1 ? "1er" : j1) + " au " + (+P.au.slice(8)) + (P.source === "tickets"
+        ? ", recalculées depuis les tickets Square publiés par Make " + publieLe(P.releve)
+          + " (mise à jour à chaque rafraîchissement)"
+        : ", relevées dans Square" + (isNaN(rel) ? "" : " le " + rel.toLocaleDateString("fr-FR")))
+      + ", avec les mêmes mesures que les mois clos ; mois incomplet, projeté au prorata des jours.";
   }
   function deMoisLong(m) { var l = moisLong(m); return (/^[aeiou]/i.test(l) ? "d'" : "de ") + l; }
 
@@ -3118,6 +3303,43 @@ demarrerEnClair();
   });
   document.addEventListener("hyp-auteur", function () { if (E) barre(); });
   PARTAGE.surChangement(function (doc) { SAUVE = etatDepuis(doc); barre(); });
+
+  /* ------------------------------------------------ données fraîches (Make)
+     Quand data.json est chargé, le tableau de bord transmet :
+       ventes  les ventes par article recalculées depuis les tickets Square,
+               pour les mois entièrement couverts et le mois en cours (jours
+               complets seulement, la journée du rafraîchissement exclue) ;
+       histo   le CA mensuel net HT des mois clos, pour la courbe et les repères.
+     Le mois en cours remplace alors celui figé dans la page, et devient le mois
+     de référence, sauf si vous en avez déjà choisi un autre. */
+  function publieLe(g) { return typeof publie === "function" ? publie(g) : ""; }
+  PARTAGE.simDonnees = function (d) {
+    var v = (d && d.ventes) || {}, enCours = null, change = false;
+    Object.keys(v).sort().forEach(function (m) {
+      var x = v[m];
+      if (!x || !x.articles || !Object.keys(x.articles).length) return;
+      if (x.complet) {
+        if (PARTIEL[m] || !MOIS[m]) { MOIS[m] = x.articles; delete PARTIEL[m]; change = true; }
+      } else if (x.jours > 0) {
+        MOIS[m] = x.articles;
+        PARTIEL[m] = { du: x.du, au: x.au, jours: x.jours, jours_mois: x.joursMois, releve: x.releve, source: "tickets" };
+        enCours = m; change = true;
+      }
+    });
+    /* Un mois partiel figé dans la page, plus ancien que le mois en cours publié
+       et que les tickets ne couvrent plus en entier : il est périmé. */
+    if (enCours) Object.keys(PARTIEL).forEach(function (m) {
+      if (m < enCours) { delete PARTIEL[m]; delete MOIS[m]; change = true; }
+    });
+    if (d && Array.isArray(d.histo) && d.histo.length >= 3) { HISTO = d.histo.slice(-12); change = true; }
+    if (!change) return;
+    recalculerMois();
+    if (!MOIS_CHOISI || !MOIS[E.mois]) { E.mois = moisDefaut(); E.ca = caDepart(E.mois); }
+    else if (estPartiel(E.mois)) E.ca = caDepart(E.mois);
+    chargerMois(E.mois);
+    $("ca").value = Math.round(E.ca); $("ca-r").value = E.ca;
+    batirMois(); dessinerSpark(); rendre();
+  };
 
   dessinerSpark();
   SAUVE = copier(DEFAUT);
