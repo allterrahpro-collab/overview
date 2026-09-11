@@ -104,6 +104,11 @@ body{background:var(--ground); color:var(--ink);
 #msg{font-size:13px; padding:10px 14px; border-radius:4px; display:none}
 #msg.ok{display:block; background:var(--green-soft); color:var(--green); border-left:3px solid var(--green)}
 #msg.err{display:block; background:var(--crit-soft); color:var(--crit); border-left:3px solid var(--crit)}
+/* ---- bouton Rafraîchir ---- */
+.rafbar{display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; margin-top:-24px}
+.rafmsg{margin:0; font-size:12.5px; color:var(--mut); max-width:80ch}
+.rafmsg:empty{display:none}
+.rafmsg.ok{color:var(--green)} .rafmsg.err{color:var(--crit)}
 /* ---- impayés : liste complète, factures dépliables ---- */
 .imptete{display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap}
 .imptete h3{margin:0}
@@ -426,10 +431,14 @@ a{color:var(--roast)}
   </div>
   <div class="meta" id="hmeta"></div>
 </header>
+<div class="rafbar" id="raf">
+  <button type="button" class="hypsave" id="raf-btn">Rafraîchir les données</button>
+  <p class="rafmsg" id="raf-msg" role="status"></p>
+</div>
 
 <details class="sec" id="sec-donnees">
   <summary class="shead"><h2>Données</h2>
-    <span class="sub">seul l'export Axonaut se met à jour depuis cette page</span><span class="secval" id="sv-donnees"></span></summary>
+    <span class="sub">publiées par Make le lundi à 7h, ou à la demande avec « Rafraîchir les données »</span><span class="secval" id="sv-donnees"></span></summary>
   <div class="secbody">
   <div class="sources sources-seule">
     <div class="srcstate">
@@ -980,6 +989,88 @@ async function hypEnregistrer(auteur, resume, doc) {
 const HYP_DELAI = "Les autres le verront d'ici dix minutes au plus : c'est le délai du cache de " +
   "GitHub Pages. Recharger la page avant peut encore montrer l'ancienne version.";
 
+/* ------------------------------------------------------ bouton Rafraîchir
+   Le bouton appelle un webhook Make (scénario 7358243), qui lance le scénario
+   du lundi (7282124), attend qu'il ait fini — une trentaine de secondes — et
+   répond. Un verrou côté Make refuse un second lancement dans les dix minutes :
+   chaque passage coûte environ 250 opérations. Ensuite, GitHub Pages met
+   jusqu'à dix minutes à servir le nouveau data.json : la page le guette et
+   propose de recharger quand il est là, sans jamais recharger d'office. */
+const RAF_WEBHOOK = "https://hook.eu1.make.com/je2i3wj1njfefv8enbjiiykf4y6dqu1f";
+const RAF_PAS = 20000, RAF_MAX = 12 * 60000;
+let RAF_GUET = null;
+/* « le 11/09/2026 à 10:12 » si l'heure est connue, sinon « le 11/09/2026 ». */
+function publie(g) {
+  const d = g ? new Date(g) : null;
+  if (!d || isNaN(d)) return "à une date inconnue";
+  return "le " + d.toLocaleDateString("fr-FR") +
+    (/T\d/.test(String(g)) ? " à " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "");
+}
+function rafMsg(html, cls) {
+  const m = $("raf-msg");
+  m.className = "rafmsg" + (cls ? " " + cls : "");
+  m.innerHTML = html;
+}
+function rafBouton(actif, texte) {
+  $("raf-btn").disabled = !actif;
+  $("raf-btn").textContent = texte || "Rafraîchir les données";
+}
+async function rafraichir() {
+  const avant = DATA ? DATA.genere : null;
+  rafBouton(false, "Rafraîchissement…");
+  rafMsg("Make interroge Axonaut et Square, puis republie les données. Comptez une trentaine de secondes.");
+  let rep = null;
+  try {
+    const r = await fetch(RAF_WEBHOOK, { method: "POST", body: new URLSearchParams({ demande: new Date().toISOString() }) });
+    const texte = await r.text();
+    try { rep = JSON.parse(texte); } catch (e) { rep = null; }
+    if (!r.ok || !rep) throw new Error("HTTP " + r.status + (texte ? ", « " + texte.slice(0, 80) + " »" : ""));
+  } catch (e) {
+    rafBouton(true);
+    rafMsg("Le rafraîchissement n'a pas été confirmé (" + esc((e && e.message) || e) + "). Regardez dans Make le " +
+      "scénario « Terrah — bouton Rafraîchir du dashboard ».", "err");
+    return;
+  }
+  if (rep.ok !== true) {
+    const depuis = Math.max(0, +rep.depuis || 0);
+    rafBouton(true);
+    rafMsg("Un rafraîchissement a déjà été lancé il y a " + Math.max(1, Math.round(depuis / 60)) + " min : on attend dix " +
+      "minutes entre deux, réessayez dans " + Math.max(1, Math.ceil((600 - depuis) / 60)) + " min. Ses données arrivent " +
+      "de toute façon d'ici quelques minutes.", "err");
+    guetter(avant);
+    return;
+  }
+  rafBouton(false, "Rafraîchi à " + (rep.heure || "?"));
+  rafMsg("Données republiées à " + esc(rep.heure || "?") + ". GitHub Pages met jusqu'à dix minutes à servir la " +
+    "nouvelle version : la page vous prévient dès qu'elle est là.", "ok");
+  guetter(avant);
+}
+function guetter(avant) {
+  clearInterval(RAF_GUET);
+  const debut = Date.now();
+  RAF_GUET = setInterval(async () => {
+    if (Date.now() - debut > RAF_MAX) {
+      clearInterval(RAF_GUET);
+      rafBouton(true);
+      rafMsg("La nouvelle version n'est toujours pas servie après douze minutes : rechargez la page un peu plus tard.", "err");
+      return;
+    }
+    try {
+      const r = await fetch("data.json?t=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) return;
+      const d = await r.json();
+      if (!d || !d.genere || d.genere === avant) return;
+      clearInterval(RAF_GUET);
+      rafBouton(true);
+      rafMsg("Les nouvelles données sont en ligne, publiées " + esc(publie(d.genere)) + ". " +
+        "<button type='button' class='linkbtn' id='raf-recharger'>Recharger la page</button> " +
+        "(les essais non enregistrés du simulateur seraient perdus).", "ok");
+      $("raf-recharger").addEventListener("click", () => location.reload());
+    } catch (e) { /* réseau capricieux : on retente au prochain tour */ }
+  }, RAF_PAS);
+}
+$("raf-btn").addEventListener("click", rafraichir);
+
 /* ------------------------------------------------------------- objectifs
    Trois couches : les valeurs livrées par data.json (le socle), recouvertes
    par celles enregistrées dans hypotheses.json, recouvertes à l'écran par les
@@ -1471,9 +1562,8 @@ function render() {
   $("hperiod").innerHTML = esc(pLabel(PKEY)) +
     (partial ? ' <span style="color:var(--mut);font-size:.62em;font-weight:500">en cours · ' +
       elapsed + (elapsed > 1 ? " jours" : " jour") + " sur " + span + "</span>" : "");
-  $("hmeta").innerHTML = "Données publiées le " +
-    (DATA.genere ? new Date(DATA.genere).toLocaleDateString("fr-FR") : "?") +
-    "<br>rafraîchies chaque lundi matin";
+  $("hmeta").innerHTML = "Données publiées " + publie(DATA.genere) +
+    "<br>rafraîchies chaque lundi matin, ou avec le bouton ci-dessous";
 
   /* Objectif d'une période ENTIÈRE : un mois vaut l'objectif mensuel tel quel,
      un trimestre en vaut trois, une semaine en vaut 7/30,44. Puis, si la période
@@ -1731,7 +1821,7 @@ function render() {
   $("imp-f-echus").setAttribute("aria-pressed", IMP_ECHUS ? "true" : "false");
   majToutDeplier();
 
-  const etat = DATA.genere ? new Date(DATA.genere).toLocaleDateString("fr-FR") : "?";
+  const etat = publie(DATA.genere).replace(/^le /, "");
   const partiels = L.dettes.filter((o) => avecReste && o.ttc > 0 && o.reste < o.ttc - 0.005).length;
   const horsHisto = L.dettes.filter((o) => o.horsHisto).length;
   $("impnote").innerHTML = avecReste
@@ -1842,7 +1932,7 @@ function renderSources() {
     ligne("Square — coffeeshop", !vieux,
       SQ.length + " jours<br>dernier jour couvert : " + jour(CACHE.sqMax)) +
     ligne("Publication du fichier", !vieux,
-      (gen ? gen.toLocaleDateString("fr-FR") : "inconnue") +
+      (gen ? publie(DATA.genere).replace(/^le /, "") : "inconnue") +
       (ageJours !== null ? "<br>il y a " + ageJours + " jour" + (ageJours > 1 ? "s" : "") : ""));
 
   $("srcnote").innerHTML = vieux
@@ -1894,8 +1984,7 @@ function secResume(cur, totalPole, actifs, relance, churn, s30, n30, panier) {
   p("sv-shop", "<b>" + eur(cur.sqCa) + "</b> · " + cur.sqTk.toLocaleString("fr-FR") +
     " passages · " + eur(panier, 2));
   p("sv-poisso", (DATA.poisso || []).filter((x) => x.statut !== "fait").length + " chantiers en cours");
-  p("sv-donnees", "publiées le " + (DATA.genere
-    ? new Date(DATA.genere).toLocaleDateString("fr-FR") : "?"));
+  p("sv-donnees", "publiées " + publie(DATA.genere));
   const essais = objEssais().length;
   p("sv-objectifs", essais ? "<span class='crit'>" + essais + " essai" + (essais > 1 ? "s" : "") +
     " non enregistré" + (essais > 1 ? "s" : "") + "</span>"
@@ -2071,7 +2160,7 @@ function adopterBrut(brut) {
 
 async function demarrerEnClair() {
   try {
-    const r = await fetch("data.json", { cache: "no-store" });
+    const r = await fetch("data.json?t=" + Date.now(), { cache: "no-store" });
     if (!r.ok) throw new Error("HTTP " + r.status);
     DATA = adopterBrut(await r.json());
     await PARTAGE.pret;   /* les objectifs enregistrés viennent de hypotheses.json */
@@ -2082,8 +2171,8 @@ async function demarrerEnClair() {
     $("msg").className = "err";
     $("msg").innerHTML = "<b>Les chiffres ne sont pas disponibles</b> (" + esc(e.message) +
       "). Le fichier <code>data.json</code> est publié chaque lundi matin par le scénario " +
-      "Make : s'il manque, c'est que le scénario n'a pas tourné. Ouvrez Make, lancez " +
-      "« Terrah — rafraîchir le dashboard » à la main, puis rechargez cette page.";
+      "Make : s'il manque, c'est que le scénario n'a pas tourné. Cliquez sur « Rafraîchir les données » " +
+      "ci-dessus, ou lancez « Terrah — rafraîchir le dashboard » dans Make.";
     document.querySelectorAll(".sec").forEach((s, i) => { if (i > 1) s.hidden = true; });
     document.querySelector(".periodbar").hidden = true;
     return;
