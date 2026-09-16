@@ -474,6 +474,7 @@ a{color:var(--roast)}
     <button type="button" data-g="W" aria-pressed="false">Semaine</button>
     <button type="button" data-g="M" aria-pressed="true">Mois</button>
     <button type="button" data-g="Q" aria-pressed="false">Trimestre</button>
+    <button type="button" data-g="S" aria-pressed="false">Semestre</button>
   </div>
   <button class="pnav" id="prev" type="button" aria-label="Période précédente">‹</button>
   <select id="period" aria-label="Période"></select>
@@ -605,19 +606,19 @@ a{color:var(--roast)}
       dans ces cas le mois entier est affiché.</p>
     </div>
     <div>
-      <h3 class="mini">Produits lancés <span class="eyebrow">relevé juin → août 2026</span></h3>
+      <h3 class="mini">Produits lancés <span class="eyebrow" id="lanc-per"></span></h3>
       <div class="tbl"><table>
-        <thead><tr><th>Produit</th><th class="n">Juin</th><th class="n">Juil</th><th class="n">Août</th>
-          <th class="n">Part mix</th><th>Verdict</th></tr></thead>
+        <thead><tr><th>Produit</th><th class="n" id="lanc-m1"></th><th class="n" id="lanc-m2"></th>
+          <th class="n" id="lanc-m3"></th><th class="n">Part mix</th><th>Verdict</th></tr></thead>
         <tbody id="lanc"></tbody></table></div>
       <p class="sublabel">Sous 1 % du mix à 8 semaines → on kill. De 1 à 3 % → on attend si la
       tendance monte, on tranche sinon. Au-dessus de 3 % → on garde.</p>
     </div>
   </div>
-  <h3 class="mini">Produits en chute <span class="eyebrow">relevé juin → août 2026</span></h3>
+  <h3 class="mini">Produits en chute <span class="eyebrow" id="dec-per"></span></h3>
   <div class="tbl"><table>
-    <thead><tr><th>Produit</th><th class="n">Juin</th><th class="n">Juil</th><th class="n">Août</th>
-      <th class="n">Évolution</th></tr></thead>
+    <thead><tr><th>Produit</th><th class="n" id="dec-m1"></th><th class="n" id="dec-m2"></th>
+      <th class="n" id="dec-m3"></th><th class="n">Évolution</th></tr></thead>
     <tbody id="dec"></tbody></table></div>
   <p class="sublabel">La catégorie <b>SOIR</b> a fait 10 € en juillet et 10 € en août : l'offre du soir
   est morte, pas en difficulté. <b>FORMULE TOAST</b> tombe à zéro parce qu'elle a été remplacée par
@@ -900,8 +901,13 @@ const DAY = 86400000;
 /* État de paiement d'une facture : un numéro de jour quand la date est connue,
    sinon l'un de ces deux codes. PAYE_SANS_DATE existe parce qu'Axonaut sait
    dire qu'une facture est réglée sans qu'on sache quand. */
-const IMPAYE = -1;
-const PAYE_SANS_DATE = -2;
+/* Ces deux codes occupent la place d'un numéro de jour : ils doivent tomber
+   hors de toute date réelle. L'époque est au 01/01/2025, donc 2024 compte en
+   négatif — d'où des valeurs très basses, et non -1 et -2 qui étaient aussi
+   le 31 et le 30 décembre 2024. */
+const IMPAYE = -1e9;
+const PAYE_SANS_DATE = -1e9 - 1;
+const estDate = (v) => v !== IMPAYE && v !== PAYE_SANS_DATE;
 const NB = " ";
 const MOISFR = ["jan","fév","mars","avr","mai","juin","juil","août","sept","oct","nov","déc"];
 
@@ -1205,6 +1211,7 @@ function pkeyOf(dayN, gran) {
   const d = dayToDate(dayN);
   if (gran === "M") return "M" + d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0");
   if (gran === "Q") return "Q" + d.getUTCFullYear() + "-" + (Math.floor(d.getUTCMonth() / 3) + 1);
+  if (gran === "S") return "S" + d.getUTCFullYear() + "-" + (d.getUTCMonth() < 6 ? 1 : 2);
   const w = isoWeek(d);
   return "W" + w[0] + "-" + String(w[1]).padStart(2, "0");
 }
@@ -1213,6 +1220,7 @@ function pLabel(k) {
   const [y, n] = rest.split("-");
   if (g === "M") return MOISFR[+n - 1] + " " + y;
   if (g === "Q") return "T" + n + " " + y;
+  if (g === "S") return (n === "1" ? "1er" : "2e") + " semestre " + y;
   return "sem. " + (+n) + " · " + y;
 }
 function pShort(k) {
@@ -1220,7 +1228,8 @@ function pShort(k) {
   const [y, n] = rest.split("-");
   if (g === "M") return MOISFR[+n - 1] + NB + y.slice(2);
   if (g === "Q") return "T" + n + NB + y.slice(2);
-  return "S" + (+n);
+  if (g === "S") return "S" + n + NB + y.slice(2);
+  return "s" + (+n);
 }
 function yearAgo(k) {
   const [g, rest] = [k[0], k.slice(1)];
@@ -1231,6 +1240,7 @@ function pRange(k) {
   const g = k[0], [y, n] = k.slice(1).split("-");
   if (g === "M") return [Date.UTC(+y, +n - 1, 1), Date.UTC(+y, +n, 1)];
   if (g === "Q") return [Date.UTC(+y, (+n - 1) * 3, 1), Date.UTC(+y, +n * 3, 1)];
+  if (g === "S") return [Date.UTC(+y, (+n - 1) * 6, 1), Date.UTC(+y, +n * 6, 1)];
   const f = new Date(Date.UTC(+y, 0, 4));
   f.setUTCDate(f.getUTCDate() - ((f.getUTCDay() + 6) % 7));
   const s = f.getTime() + (+n - 1) * 7 * DAY;
@@ -1279,7 +1289,7 @@ function classify(cat, prod, titre) {
 /* ------------------------------------------------------------- agrégation */
 function build() {
   CACHE = {};
-  for (const g of ["W", "M", "Q"]) {
+  for (const g of ["W", "M", "Q", "S"]) {
     const m = new Map();
     const get = (k) => {
       if (!m.has(k)) m.set(k, { rec: 0, ven: 0, evt: 0, aju: 0, sqCa: 0, sqTk: 0, lines: [] });
@@ -1424,7 +1434,7 @@ function clientStats() {
     /* Trois états possibles pour le paiement : une date, PAYE_SANS_DATE, ou
        IMPAYE. Une date connue l'emporte sur tout ; à défaut, savoir que la
        facture est réglée vaut mieux que de la laisser en impayé. */
-    if (a[4] >= 0) o.paid = a[4];
+    if (estDate(a[4])) o.paid = a[4];
     else if (a[4] === PAYE_SANS_DATE && o.paid === IMPAYE) o.paid = PAYE_SANS_DATE;
   }
   return { last, first, dates, inv };
@@ -1618,7 +1628,7 @@ function render() {
   /* Objectif d'une période ENTIÈRE : un mois vaut l'objectif mensuel tel quel,
      un trimestre en vaut trois, une semaine en vaut 7/30,44. Puis, si la période
      est en cours, on proratise sur la part écoulée — et seulement là. */
-  const baseMult = GRAN === "M" ? 1 : GRAN === "Q" ? 3 : 7 / 30.44;
+  const baseMult = GRAN === "M" ? 1 : GRAN === "Q" ? 3 : GRAN === "S" ? 6 : 7 / 30.44;
   const objFull = (m) => m * baseMult;
   const mult = baseMult * (elapsed / span);
   $("tiles").innerHTML =
@@ -1754,14 +1764,14 @@ function render() {
     ligneCumul("Total B2B", cumA.rec + cumA.ven + cumA.evt, cumN1.rec + cumN1.ven + cumN1.evt, 0, "");
 
   /* Les trois flux empilés, période par période */
-  const NF = GRAN === "W" ? 16 : GRAN === "Q" ? 8 : 13;
+  const NF = GRAN === "W" ? 16 : GRAN === "Q" ? 8 : GRAN === "S" ? 6 : 13;
   const winF = keys.slice(Math.max(0, i - NF + 1), i + 1);
   $("chflux").innerHTML = svgPile(winF.map((k) => {
     const x = P(k);
     return { label: pLabel(k), short: pShort(k), parts: [x.rec, x.ven, x.evt], cur: k === PKEY, partial: k === PKEY && partial };
   }), { noms: ["récurrent", "ventes", "événementiel"], alt: "CA B2B par flux et par période" });
 
-  const N = GRAN === "W" ? 16 : GRAN === "Q" ? 8 : 13;
+  const N = GRAN === "W" ? 16 : GRAN === "Q" ? 8 : GRAN === "S" ? 6 : 13;
   const win = keys.slice(Math.max(0, i - N + 1), i + 1);
   $("chrec").innerHTML = svgBars(
     win.map((k) => ({ label: pLabel(k), short: pShort(k), v: P(k).rec, cur: k === PKEY,
@@ -1858,7 +1868,7 @@ function render() {
   }
   const s30 = buck.slice(1).reduce((s, b) => s + b[3], 0), n30 = buck.slice(1).reduce((s, b) => s + b[1], 0);
   const delays = [];
-  CS.inv.forEach((o) => { if (o.paid >= 0) delays.push(o.paid - o.d); });
+  CS.inv.forEach((o) => { if (estDate(o.paid)) delays.push(o.paid - o.d); });
   $("imp30").textContent = eur(s30);
   $("imp30n").textContent = n30 + " factures au-delà de 30 jours · " + (avecReste ? "reste dû TTC" : "montant HT");
   $("imptxt").innerHTML = "Le délai de paiement médian réel est de <b>" + (delays.length ? median(delays).toFixed(0) : "—") +
@@ -1970,9 +1980,10 @@ function render() {
     line: true, lmin: Math.floor(Math.min(...ls) * 10) / 10 - 0.2, lmax: Math.ceil(Math.max(...ls) * 10) / 10 + 0.2,
     obj: objFull(O.oberkampf_mensuel), objLabel: "objectif " + eur(objFull(O.oberkampf_mensuel)),
   }) : '<p class="empty">Pas de données Square sur cette fenêtre.</p>';
-  $("shopnote").innerHTML = "<b>Le panier monte, le flux baisse.</b> Sur l'année écoulée le panier moyen a gagné " +
-    "près de 7 %, mais les passages ont reculé de près de 40 % depuis le pic d'octobre. " +
-    "La hausse du panier masque la perte de fréquentation : c'est le flux qu'il faut regarder, pas le CA seul.";
+  /* Ce commentaire était écrit à la main, donc vrai un mois et faux le suivant.
+     Il se calcule maintenant sur les mois réellement clos : on compare le
+     dernier mois clos au même mois un an plus tôt, et au mois record. */
+  $("shopnote").innerHTML = noteCoffeeshop();
 
   const mixCur = mixFor(PKEY), mixPrev = prevK ? mixFor(prevK) : null;
   $("mixlbl").textContent = mixCur ? pLabel(PKEY) : "";
@@ -1991,24 +2002,119 @@ function render() {
     }).join("") + "<tr><td class='cl'><b>Total</b></td><td class='n'><b>" + eur(tot) +
       "</b></td><td class='n'><b>100" + NB + "%</b></td><td></td></tr>";
   }
-  $("lanc").innerHTML = DATA.lancements.map((L) => {
-    const [nom, cat, j6, j7, j8, pm] = L;
-    const v = pm >= 3 ? ["good", "on garde"] : pm >= 1 ? (j8 >= j7 ? ["warn", "on attend"] : ["crit", "à trancher"]) : ["crit", "on kill"];
-    return "<tr><td class='cl'>" + esc(nom) + "</td><td class='n'>" + eur(j6) + "</td><td class='n'>" + eur(j7) +
-      "</td><td class='n'>" + eur(j8) + "</td><td class='n'>" + String(pm).replace(".", ",") + NB +
-      "%</td><td><span class='pill " + v[0] + "'>" + v[1] + "</span></td></tr>";
-  }).join("");
-  $("dec").innerHTML = DATA.declins.map((L) => {
-    const [nom, cat, j6, j7, j8, ev] = L;
-    return "<tr><td class='cl'>" + esc(nom) + "</td><td class='n'>" + eur(j6) + "</td><td class='n'>" + eur(j7) +
-      "</td><td class='n'>" + eur(j8) + "</td><td class='n down'>" + pctTxt(ev) + "</td></tr>";
-  }).join("");
+  rendreProduits();
 
   secResume(cur, totalPole, actifs, rec.length, churn.length, s30, n30, panier);
 
   $("poisso").innerHTML = DATA.poisso.map((p) =>
     "<tr><td class='cl'>" + esc(p.chantier) + "</td><td><span class='pill " +
     (p.statut === "fait" ? "good" : "warn") + "'>" + esc(p.statut) + "</span></td></tr>").join("");
+}
+
+/* ------------------------------------------------- produits, mois glissants */
+/* Les ventes par article ne sont mensuelles que chez Square : la fenêtre des
+   produits lancés et des produits en chute est donc de trois mois clos, ancrée
+   sur la date de mise à jour. Elle avance d'un cran à chaque mois qui se
+   termine, au lieu de rester figée sur le relevé d'origine. */
+/* Panier moyen et fréquentation : le constat, pas une phrase de circonstance. */
+function noteCoffeeshop() {
+  const mois = CACHE.M.keys.filter((k) => CACHE.M.map.get(k).sqTk > 0).sort();
+  const clos = mois.filter((k) => k !== pkeyOf(CACHE.asOf, "M"));
+  if (clos.length < 2) return "Pas encore assez de mois clos pour commenter la tendance.";
+  const dernier = clos[clos.length - 1], b = P2(dernier);
+  const pic = clos.reduce((x, k) => (P2(k).sqTk > P2(x).sqTk ? k : x), clos[0]);
+  const pan = (k) => { const o = P2(k); return o.sqTk ? o.sqCa / o.sqTk : 0; };
+  const an = yearAgo(dernier), aAn = CACHE.M.map.get(an) ? an : clos[0];
+  const dPanier = pan(aAn) ? (pan(dernier) / pan(aAn) - 1) * 100 : 0;
+  const dFlux = P2(pic).sqTk ? (b.sqTk / P2(pic).sqTk - 1) * 100 : 0;
+  const mot = (v) => (v >= 0 ? "gagné" : "perdu");
+  if (pic === dernier) {
+    return "<b>" + pLabel(dernier) + " est le meilleur mois en fréquentation</b> depuis l'ouverture, avec " +
+      nbt(b.sqTk) + " passages et un panier moyen de " + eur(pan(dernier), 2) + ".";
+  }
+  return "<b>" + (dPanier >= 0 && dFlux < 0 ? "Le panier monte, le flux baisse." :
+    dFlux >= 0 ? "La fréquentation repart." : "Panier et fréquentation reculent ensemble.") +
+    "</b> Sur un an le panier moyen a " + mot(dPanier) + " " + Math.abs(dPanier).toFixed(0) + NB +
+    "%, et les passages ont " + mot(dFlux) + " " + Math.abs(dFlux).toFixed(0) + NB + "% depuis le pic de " +
+    pLabel(pic) + " (" + nbt(P2(pic).sqTk) + " passages, " + nbt(b.sqTk) + " en " + pLabel(dernier) + ")." +
+    (dPanier > 0 && dFlux < 0 ? " La hausse du panier masque la perte de fréquentation : c'est le flux qu'il faut regarder, pas le CA seul." : "");
+}
+const P2 = (k) => CACHE.M.map.get(k) || { sqCa: 0, sqTk: 0 };
+const nbt = (x) => Math.round(x).toLocaleString("fr-FR");
+
+PARTAGE.majProduits = () => { try { rendreProduits(); } catch (e) { /* la page n'est pas encore rendue */ } };
+function moisCourt(m) { return MOISFR[+m.slice(5, 7) - 1]; }
+function moisLong(m) { return MOISFR[+m.slice(5, 7) - 1] + " " + m.slice(0, 4); }
+
+/* Rendu des deux tableaux de produits. Appelé au rendu général, puis rappelé
+   par le simulateur dès qu'il a fusionné le référentiel et les tickets : au
+   tout premier passage la fenêtre glissante n'est pas encore disponible. */
+function rendreProduits() {
+  if (!DATA) return;
+  const gliss = moisGlissants();
+  const lancements = gliss ? gliss.lancements : DATA.lancements;
+  const declins = gliss ? gliss.declins : DATA.declins;
+  const enTetes = gliss ? gliss.win.map(moisCourt) : ["Juin", "Juil", "Août"];
+  const periode = gliss
+    ? "relevé " + moisCourt(gliss.win[0]).toLowerCase() + " → " + moisLong(gliss.win[2])
+    : "relevé juin → août 2026";
+  ["lanc", "dec"].forEach((p) => {
+    $(p + "-per").textContent = periode;
+    enTetes.forEach((t, i) => { $(p + "-m" + (i + 1)).textContent = t; });
+  });
+  $("lanc").innerHTML = lancements.map((L) => {
+    const [nom, cat, j6, j7, j8, pm] = L;
+    const v = pm >= 3 ? ["good", "on garde"] : pm >= 1 ? (j8 >= j7 ? ["warn", "on attend"] : ["crit", "à trancher"]) : ["crit", "on kill"];
+    return "<tr><td class='cl'>" + esc(nom) + "</td><td class='n'>" + eur(j6) + "</td><td class='n'>" + eur(j7) +
+      "</td><td class='n'>" + eur(j8) + "</td><td class='n'>" + String(pm).replace(".", ",") + NB +
+      "%</td><td><span class='pill " + v[0] + "'>" + v[1] + "</span></td></tr>";
+  }).join("");
+  $("dec").innerHTML = declins.map((L) => {
+    const [nom, cat, j6, j7, j8, ev] = L;
+    return "<tr><td class='cl'>" + esc(nom) + "</td><td class='n'>" + eur(j6) + "</td><td class='n'>" + eur(j7) +
+      "</td><td class='n'>" + eur(j8) + "</td><td class='n down'>" + pctTxt(ev) + "</td></tr>";
+  }).join("");
+}
+
+function moisGlissants() {
+  const src = PARTAGE.articlesMensuels ? PARTAGE.articlesMensuels() : null;
+  if (!src || !src.mois) return null;
+  const partiel = src.partiel || {};
+  const clos = Object.keys(src.mois).filter((m) => !partiel[m] && Object.keys(src.mois[m] || {}).length).sort();
+  if (clos.length < 3) return null;
+  const win = clos.slice(-3);
+  /* Square écrit le même article de plusieurs façons (« OEUF À LA COQUE » et
+     « Oeuf à la coque »). Sans regroupement, un simple changement de casse
+     passe pour un lancement. On agrège sur une clé normalisée et on affiche
+     l'orthographe qui a vendu le plus. */
+  const cle = (n) => n.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
+  const noms = new Map();
+  const ca = win.map((m) => {
+    const o = {};
+    for (const [nom, v] of Object.entries(src.mois[m])) {
+      const k = cle(nom), montant = +(v && v[1]) || 0;
+      o[k] = (o[k] || 0) + montant;
+      const vu = noms.get(k);
+      if (!vu || montant > vu[1]) noms.set(k, [nom, montant]);
+    }
+    return o;
+  });
+  const total3 = Object.values(ca[2]).reduce((s, v) => s + v, 0);
+  const arr = [...noms.keys()].map((k) => [noms.get(k)[0], ca[0][k] || 0, ca[1][k] || 0, ca[2][k] || 0]);
+
+  /* Lancé : absent du premier mois de la fenêtre, présent au dernier. */
+  const lancements = arr.filter((a) => a[1] === 0 && a[3] > 0)
+    .sort((a, b) => b[3] - a[3]).slice(0, 7)
+    .map((a) => [a[0], "", Math.round(a[1]), Math.round(a[2]), Math.round(a[3]),
+      total3 ? Math.round(a[3] / total3 * 10000) / 100 : 0]);
+
+  /* En chute : présent au départ, au moins 40 % de CA en moins à l'arrivée. */
+  const declins = arr.filter((a) => a[1] > 0 && a[3] <= a[1] * 0.6)
+    .sort((a, b) => (b[1] - b[3]) - (a[1] - a[3])).slice(0, 5)
+    .map((a) => [a[0], "", Math.round(a[1]), Math.round(a[2]), Math.round(a[3]),
+      Math.round((a[3] / a[1] - 1) * 1000) / 10]);
+
+  return { win, lancements, declins };
 }
 
 /* ---------------------------------------------------------------- sources */
@@ -2125,6 +2231,22 @@ function histoMensuel() {
   return [...par.keys()].sort().filter((k) => k < courant && premier <= k + "-01").map((k) => [k, Math.round(par.get(k))]);
 }
 
+/* ------------------------------------------------ historique antérieur à 2025
+   Le scénario Make ne relit que les factures des 120 derniers jours et les
+   impayés : 2024 ne repassera jamais par data.json. Ces lignes-là ne bougeront
+   plus, on les fige dans la page. Elles sont écrites en colonnes — les noms de
+   clients, de produits et de catégories se répètent trop pour être recopiés
+   ligne à ligne — et rendues ici à la forme que le chargement attend. */
+const AX2024_BRUT = {"D":["2024-01-02","2024-01-03","2024-01-04","2024-01-05","2024-01-06","2024-01-09","2024-01-11","2024-01-17","2024-01-24","2024-01-29","2024-01-30","2024-01-31","2024-02-01","2024-02-04","2024-02-05","2024-02-06","2024-02-07","2024-02-08","2024-02-09","2024-02-13","2024-02-14","2024-02-16","2024-02-19","2024-02-20","2024-02-21","2024-02-22","2024-02-23","2024-02-26","2024-02-27","2024-02-29","2024-03-01","2024-03-04","2024-03-05","2024-03-06","2024-03-07","2024-03-08","2024-03-09","2024-03-11","2024-03-12","2024-03-13","2024-03-14","2024-03-19","2024-03-21","2024-03-22","2024-03-23","2024-03-25","2024-03-26","2024-03-27","2024-03-28","2024-03-29","2024-04-01","2024-04-02","2024-04-03","2024-04-04","2024-04-05","2024-04-07","2024-04-08","2024-04-09","2024-04-10","2024-04-11","2024-04-12","2024-04-15","2024-04-16","2024-04-17","2024-04-18","2024-04-19","2024-04-20","2024-04-21","2024-04-22","2024-04-23","2024-04-24","2024-04-25","2024-04-26","2024-04-27","2024-04-29","2024-04-30","2024-05-01","2024-05-02","2024-05-03","2024-05-05","2024-05-06","2024-05-07","2024-05-09","2024-05-14","2024-05-15","2024-05-16","2024-05-17","2024-05-18","2024-05-19","2024-05-20","2024-05-21","2024-05-22","2024-05-23","2024-05-26","2024-05-27","2024-05-28","2024-05-29","2024-05-30","2024-05-31","2024-06-03","2024-06-05","2024-06-06","2024-06-07","2024-06-09","2024-06-10","2024-06-11","2024-06-13","2024-06-14","2024-06-17","2024-06-18","2024-06-19","2024-06-21","2024-06-23","2024-06-24","2024-06-25","2024-06-27","2024-06-28","2024-06-30","2024-07-01","2024-07-02","2024-07-03","2024-07-04","2024-07-05","2024-07-08","2024-07-09","2024-07-10","2024-07-11","2024-07-12","2024-07-15","2024-07-16","2024-07-17","2024-07-18","2024-07-19","2024-07-21","2024-07-22","2024-07-23","2024-07-24","2024-07-25","2024-07-27","2024-07-29","2024-07-30","2024-07-31","2024-08-01","2024-08-05","2024-08-06","2024-08-07","2024-08-09","2024-08-13","2024-08-16","2024-08-19","2024-08-20","2024-08-21","2024-08-23","2024-08-27","2024-08-28","2024-08-29","2024-08-30","2024-09-01","2024-09-02","2024-09-03","2024-09-04","2024-09-05","2024-09-08","2024-09-09","2024-09-10","2024-09-12","2024-09-13","2024-09-16","2024-09-17","2024-09-18","2024-09-19","2024-09-20","2024-09-21","2024-09-23","2024-09-24","2024-09-25","2024-09-26","2024-09-27","2024-09-30","2024-10-01","2024-10-02","2024-10-03","2024-10-04","2024-10-05","2024-10-07","2024-10-08","2024-10-10","2024-10-11","2024-10-14","2024-10-15","2024-10-16","2024-10-17","2024-10-18","2024-10-19","2024-10-21","2024-10-22","2024-10-23","2024-10-25","2024-10-27","2024-10-28","2024-10-29","2024-10-30","2024-11-01","2024-11-04","2024-11-05","2024-11-07","2024-11-11","2024-11-12","2024-11-13","2024-11-14","2024-11-15","2024-11-19","2024-11-20","2024-11-21","2024-11-22","2024-11-25","2024-11-26","2024-11-28","2024-11-29","2024-12-02","2024-12-03","2024-12-04","2024-12-05","2024-12-06","2024-12-09","2024-12-10","2024-12-12","2024-12-13","2024-12-16","2024-12-17","2024-12-19","2024-12-20","2024-12-21","2024-12-23","2024-12-24","2024-12-26","2024-12-27","2024-12-30","2024-12-31","2025-01-02","2025-01-03","2025-01-10","2025-01-14","2025-01-15","2025-01-16","2025-01-17","2025-01-22","2025-01-28","2025-01-30","2025-01-31","2025-02-03","2025-02-04","2025-02-08","2025-02-10","2025-02-18","2025-03-21","2025-03-24","2025-03-26","2025-04-25","2025-04-28","2025-05-02","2025-06-19","2025-06-25"],"C":["MAISON MAGUET","Oh vin Dieu","Eurodec - CLIENT","Waltio","Hark Group","Optima experts","A table","Yora Paris","MICHO","Momen","Curiosa Films","ONE DRY NUGGET","Yora Sentier (rue du Caire)","Café Princesse (JMB Restauration)","Les Coltineurs","Dimanche Pigalle","Grand Musique Management","Marguerite","The New Me (MUMDAY MORNINGS)","SIMA productions","One Dry Nugget (Delight)","Omedo","Kalys","Ecole Nationale Supérieure du Café (ENSC)","Chez Achille","DANONE PRODUITS FRAIS FRANCE","Restaurant Prout Prout","BREMART","SAS Dim Sum Cantine (Onisuko)","Les Pépites, maison d'artisans","Simplébo","SAS LKFM (Restaurant SAMA)","Kiji","Keen Je","Gregory Bouveyron","Polycea","Association THSN","Talent AtScale","Dingue de Lunettes","Golosa","Colisée Family Office","La Totale","Les Bruleurs Associés","Honfleur PCO","Isciacus","Finexsi","AS Passy","Maurice Sfez Café","Buzzman","Korint","Freeland Management Services","Zat Zat","Bistrot Rougemont (SAS Andrea)","Broken biscuits","Candle Kids","Bake and Blend","Ambassade OCDE Colombie","Café San Francisco","Barista Gallery","Phacet Labs","Gm2t","My Homie","Inskip","Caducée","Malou","Reguida (Osmose Gym)","Forum ESTP","DICE Caffe","Cesam-Treuil","Gusto Conseils","Phenomenex"],"K":["Sous-Location Bureau","Café","Vente Matériel / Machine","Thé / Infusion","Matériel / Machine","Formations","Services","Evénements","","Entretien","Café Vert"],"P":["Mise à disposition d’un espace de travail","Café - La Estrellita","Café en grains","Location Machine DeLonghi Dinamica FEB 3535","Café - La Alondra","Café - La Fortuna","Infusion fruitée - Jazzy Night","Machine - DeLonghi Dinamica FEB 3535","Produits entretien Machine","Formation Barista Niveau 1 (Espresso & Latte Art)","Infusion Plantes - Apaisante","Thé Vert Passion","Mise à disposition d'un espace de travail","Recouvrement Loc Machine Nov 2023 - Fev 2024","Café grains - Blend Terrah","Déca moulu","Déplacement et réparation de machine","Envoi à domicile","Stand 43 Paris Coffee Festival","Droits de participation","Livraison - OFFERTE","Café - Gaitania - Colombie","Rétro commission - The New Me MAUBEUGE","Récupération anticipée machine","Machine Rocket Appartamento - Occasion","Moulin Compak K3 Touch Advance (Reconditionné)","Matériel d'entretien (Filtre aveugle, Pully Caff, pichet, knock box)","Sachets et étiquettes café","Boites matcha","Lait Avoine spécial Barista","Machine DeLonghi Dinamica - Yora Galeries","Fortuna en grains","Gaitana en grains","Café - La Indonesia","MACHINE À EXPRESSO - Sage THE ORACLE TOUCH - NOIR","La Marzocco Linéa PB - reconditionnée","Moulin Victoria Arduino - Mythos MY75","Installation machine traditionnelle 2 groupes, Cartouche BWT taille M, tête et débimètre BWT","Machine Nuova Simonelli","Location Machine Nuova Simonelli","Café - La Chiquita - Geisha Fermenté","Café - El Tabi","Blend Colombien en grains (200g)","Thé Vert (70g)","Livraison express","Détartrant machine delonghi","Machine Sage Barista Express Impress - Blanc Sel de Mer","4 filtres + 1 part de marbré","Café - El Bourbon","Paquet 200g Blend colombien","Paquet 200g La Fortuna","Paquet 200g - El Tabi","Moulin Sage - Occasion","Machine DeLonghi Dinamica FEB 3535- Reconditionnée","Vert - san pedro","Jura x6","Offert : installation, nettoyage et réglage des machine","Café - Popayan","TOP 50 TGB ( capacité 50l/h) eau plate, pétillante et tempérée (1)   à poser","Maintenance  - TOP 50 TGB ( capacité 50l/h) eau plate, pétillante et tempérée (1)   à poser","Installation* IDF","Installation, réglage et formation équipement","Forfait entretien - All Inclusive (mensuel)","Paquet 200g - El Limon","Paquet 200g - El Bourbon","Café - EXSimeti - Ethiopie","Paquet 200g - La Indonesia","Paquet 200g - Gaitania","Filtre à eau - Delonghi","Entretien Machine - DeLonghi Dinamica","Sachets 200 g - Blanc","Etiquette imprimée - prête à coller x4","Café - San Pedro","Location - Machine Batch Brew - Marco BRU","Location Machine - Jura X6","Thé Vert Sencha Bio","Thé Noir - Keemun Supérieur Bio - Vrac","Café - La Caturra","Café - El Barril","Paquet 200g - San Pedro","Ceylan Dimbula Elephant (25 infusettes)","Thé Vert - Sencha Bio - 25 infusettes","Thé de Noel (chrisnouka)","Infusion fruitée - Eclatante","Prestation Barista - Clés en main","Café Décaféiné - Cauca Colombie","Atelier Dégustation","Solde"],"T":["Prestation de Service","Café Grain - Huila Colombie","Café en grains","Location Machine DeLonghi","Location Machine DeLonghi (septembre 2023)","Location Machine DeLonghi (Décembre 2023)","Café - La Estrellita","Café Grain - Blend Terrah","Café Grain - Santander","Infusion Jazzy Night (prix par 100g)","Machine DeLonghi Dinamica","Café Grain","Produits entretien","CADEAU - Café Grain","Arriéré - Location Machine DeLonghi","Café en grains (Blend Signature)","Café Moulu (Filtre)","Formation Barista Niveau 1 (Espresso & Latte Art)","Infusion fruitées (Jazzy Night + Eclatante)","Infusion plante (Apaisante)","Thés (Vert Passion & Noir )","Café Grain - Honduras","Mise à disposition d'un espace de travail","Recouvrement Loc Machine Nov 2023 - Fev 2024","Café en grains - Blend Signature","Produits entretien Machine","Café en grains - Blend Terrah","Déca","Déplacement et réparation de machine","Blend Terrah","Déca moulu","Café grains - Blend Terrah","Envoi à domicile","Package Stand 43 - Paris Coffee Festival","Droits de participation","Livraison sur site","Blend Colombien en grains","Rétro commission - The New Me MAUBEUGE","Récupération anticipée machine","Machine Rocket Appartamento (Reconditionnée)","Moulin Compak K3 Touch Advance (Reconditionné)","Matériel d'entretien (Filtre aveugle, Pully Caff, pichet, knock box, tamper)","Livraison et installation - OFFERTE","Formation Barista Niveau 1 (Espresso & mousse Lait)","Sachets et étiquettes café - OFFERT","Boites matcha","Lait Avoine édition Barista - OFFERT","Machine DeLonghi Dinamica - Yora Batignolles","Machine DeLonghi Dinamica - Yora Galeries","Café en grains - Blend","Machine - Saeco Royal Black Pack Pro (reconditionnée)","Fortuna en grains","Gaitana en grains","Maracaturra Honey (Région : Nariño, Colombie)","MACHINE À EXPRESSO - Sage THE ORACLE TOUCH - NOIR","La Marzocco Linéa PB - reconditionnée","Moulin Victoria Arduino - Mythos MY75","Installation machine traditionnelle 2 groupes, Cartouche BWT taille M, tête et débimètre BWT","Machine Nuova Simonelli - Oscar II","Offert - Location Machine Nuova Simonelli","La Chiquita - Gaisha Fermenté","La Orangina - Tabi Naturel","Café de spécialité - Blend Colombien","Blend Colombien en grains (200g)","Thé Vert (70g)","Livraison express","Kit entretien Machine","Détartrant machine delonghi","Machine Sage Barista Express Impress - Blanc Sel de Mer","Café - Blend Colombien","4 filtres + 1 part de marbré","Café - La Indonesia (Maracaturra Honey)","Café - El Tabi (Tabi Naturel)","Café - El Bourbon (Bourbon Rose Lavé)","Café - El Bourbon (Bourbon rose)","Livraison - week-end","Paquet 200g Blend colombien","Paquet 200g La Fortuna","Paquet 200g El Tabi","Café - El Tabi","Infusion Plantes (Apaisante)","Thé Vert Passion","Moulin Sage - Occasion","Livraison Weekend","Machine DeLonghi Dinamica - Reconditionnée","San Pedro","Jura x6","Offert : installation, nettoyage et réglage des machines","Café - Popayan","Café - El Bourbon","Fontaine à eau Brita - SM 50-3-FS-0 CU CE eau tempérée, fraîche et pétillante","Maintenance SM 50 - Annuelle","Installation IDF","Jura X6 - Garantie 12 mois","Installation, réglage et formation équipement","Forfait entretien - All Inclusive (mensuel)","Café en grains - Popayan","Café - El Bourbon (paquet pour le bureau de Jérôme)","Café - La Indonesia (Paquet pour le bureau de Jérôme)","Café - La Indonesia","Moulin Sage - Smart Grinder Pro","Café - Blend Colombien (Caturra)","Café - El Bourbon (Bourbon Rose)","Paquet 200g - El Bourbon","Paquet 200g - La Indonesia","Infusion Jazzy Nights","Café - solde","Paquet 200g - Blend Colombien","Paquet 200g - El Limon","Café - El Limon- Geisha Lavé","Filtre à eau - Delonghi","Café - Popayan (Moulu pour Moccamaster)","Café - La Indonesia (Moulu pour Moccamaster)","Entretien Machine - DeLonghi Dinamica","Café Colombien","Sachets blanc - 200g","Etiquette imprimée - prête à coller","Café - San Pedro","Location - Machine Batch Brew - Marco BRU","Livraison - Articles Volumineux","Location Machine - Jura X6","Formation Barista Niveau 1 (Caféologie, Espresso & Latte Art)","Machine DeLonghi Magnifica - Occasion","Livraison Hors Paris / Volumineux","Thé Vert Fleur de cerise","Thé Vert Sencha Bio","Thé Noir - Keemun Supérieur BIO","Infusion fruitée - Jazzy Night","Livraison Hors Paris","Sachet blanc - Vente détail","Café - La Caturra","Café - El Barril","Sachets kraft - 1kg","Sachets blanc vente détail premium- 200g","Sachets kraft vente détail - 500g","Paquet 200g - San Pedro","Café - El Bourbon - Echantillon","Installation, réglage et formation équipement - OFFERT","Machine DeLonghi Dinamica FEB 3535 - Occasion","Infusion Goji Power - Vrac","Thé Noir - Ceylan Supérieur - 25 infusettes","Thé Vert - Sencha Bio - 25 infusettes","Thé de Noel (chrisnouka)","infusion fruitée - Eclatante","Machine - DeLonghi Dinamica FEB 3535 SB","Prestation Barista - Clés en main","Café Décaféiné - Colombie","Café Décaféiné - Cauca Colombie","Formation Barista","Atelier Dégustation","Frais de Déplacement","Solde"],"L":[["9407058",0,0,0,0,0,95000,0],["9415726",1,1,1,1,1,13500,14],["9418478",1,2,1,2,2,12800,68],["9418478",1,2,2,3,3,3000,68],["9424197",2,3,1,2,2,5402,15],["9424197",2,3,2,3,3,3501,15],["9429396",2,4,2,3,4,3500,6],["9429396",2,4,2,3,5,3500,6],["9430788",2,5,1,2,2,13500,5],["9431354",2,6,1,1,6,13500,153],["9443385",3,4,1,2,2,14500,15],["9443385",3,4,2,3,3,3500,15],["9456158",4,7,2,3,3,3500,18],["9456158",4,7,1,2,2,43500,18],["9480844",5,8,1,4,7,32370,18],["9557237",6,9,1,5,8,37500,9],["9624247",7,10,1,2,2,21600,17],["9695462",8,11,3,6,9,1800,27],["9732886",9,12,2,7,10,41900,18],["9732886",9,12,1,4,11,4980,18],["9732886",9,12,4,8,12,0,18],["9732886",9,12,1,4,13,0,18],["9740666",9,7,2,3,14,28000,52],["9781429",10,13,1,2,15,37350,30],["9781429",10,13,1,2,16,14193,30],["9781429",10,13,5,9,17,0,30],["9809545",11,14,3,6,18,22000,26],["9809545",11,14,3,10,19,5500,26],["9809545",11,14,3,11,20,10000,26],["9845613",12,15,1,4,21,29880,12],["9910225",13,3,1,2,2,5402,19],["9910225",13,3,2,3,3,3501,19],["9922065",14,4,1,2,2,14500,19],["9922065",14,4,2,3,3,3500,19],["9922209",14,16,1,2,2,17400,19],["9922209",14,16,2,3,3,3500,19],["9948371",15,0,0,12,22,95000,17],["9953449",15,17,2,13,23,14000,18],["9953741",15,7,2,3,3,3500,45],["9953741",15,7,1,2,2,43500,45],["9955465",15,18,1,4,21,11500,18],["9955465",15,18,5,9,17,0,18],["9978545",15,1,1,2,24,40500,37],["9978545",15,1,4,8,25,2000,37],["9981479",16,7,2,3,3,3500,52],["10030475",18,8,1,4,7,37350,22],["10098729",19,9,1,14,26,30000,28],["10098729",19,9,1,15,27,2900,28],["10135527",20,19,1,2,2,8700,20],["10135527",20,19,2,3,3,3000,20],["10135589",20,19,1,2,2,8700,20],["10135589",20,19,2,3,3,3000,20],["10135627",20,19,2,16,28,7000,134],["10175889",21,3,1,2,2,-5402,43],["10175889",21,3,2,3,3,-3501,43],["10224707",22,20,1,14,29,13500,32],["10246093",23,6,1,2,2,10800,31],["10246093",23,6,1,15,30,2900,31],["10288391",24,2,1,2,2,12800,29],["10288391",24,2,2,3,3,3000,29],["10312967",25,1,1,2,24,40500,37],["10312967",25,1,1,15,30,2900,37],["10335865",26,21,1,2,2,5800,31],["10335865",26,21,2,3,3,3500,31],["10386463",27,22,1,14,31,16200,32],["10386463",27,22,6,17,32,2000,32],["10389121",27,23,6,18,33,327000,64],["10389121",27,23,7,19,34,19500,64],["10522217",30,17,1,2,2,8700,99],["10522217",30,17,2,3,3,3500,99],["10522829",30,19,1,2,2,8700,37],["10522829",30,19,2,3,3,3000,37],["10566727",31,5,1,2,2,13500,5],["10567229",31,24,1,2,2,22410,257],["10590715",32,4,1,2,2,14500,39],["10590715",32,4,2,3,3,3500,39],["10590819",32,16,1,2,2,17400,39],["10590819",32,16,2,3,3,3500,39],["10617373",33,0,0,12,22,95000,33],["10647027",34,7,2,3,3,3500,52],["10663891",34,15,1,4,21,7470,-1],["10663891",34,15,1,15,30,2900,-1],["10677821",35,25,1,14,31,48600,74],["10677821",35,25,2,20,35,1990,74],["10678389",35,9,1,14,26,30000,42],["10695539",36,8,1,4,7,37350,41],["10732483",37,13,1,2,15,37350,41],["10732483",37,13,1,2,16,14940,41],["10732483",37,13,1,15,30,1450,41],["10740551",38,7,2,7,10,41900,52],["10740551",38,7,4,8,12,0,52],["10740551",38,7,1,4,11,4980,52],["10740551",38,7,1,4,13,0,52],["10797243",40,26,1,21,36,6300,61],["10799931",40,27,4,22,37,83650,69],["10874237",41,20,1,14,29,13500,47],["10921945",42,2,1,2,2,12800,51],["10921945",42,2,2,3,3,3000,51],["10927051",42,3,1,2,2,-5402,43],["10927051",42,3,2,3,3,-3501,43],["10927159",42,3,6,23,38,7000,51],["10946397",43,7,1,21,36,43500,98],["10946521",43,12,1,21,36,26100,52],["10951363",43,10,1,2,2,22500,107],["10961581",44,21,1,2,2,5800,52],["10961581",44,21,2,3,3,3500,52],["10986357",45,28,4,24,39,70000,46],["10986357",45,28,2,25,40,20000,46],["10986357",45,28,4,26,41,0,46],["10986357",45,28,2,20,42,0,46],["10986357",45,28,5,9,43,0,46],["10986357",45,28,4,27,44,0,46],["10986357",45,28,4,28,45,4320,46],["10986357",45,28,8,29,46,0,46],["10986357",45,28,1,2,2,16800,46],["10994165",45,1,1,2,24,40500,74],["10994165",45,1,1,15,30,1740,74],["11015789",46,7,2,7,47,27900,52],["11047303",47,29,1,21,36,36000,126],["11059203",48,7,4,30,48,24400,52],["11059379",48,5,1,2,2,13500,113],["11060031",48,6,1,2,49,26000,57],["11065739",48,30,2,7,50,31500,51],["11065739",48,30,1,21,36,22990,51],["11069381",48,31,1,21,36,2400,98],["11069381",48,31,1,31,51,2400,98],["11069381",48,31,1,32,52,2400,98],["11102371",49,32,1,33,53,17500,59],["11152161",50,0,0,12,22,95000,51],["11152217",50,17,1,2,2,8700,99],["11152217",50,17,2,3,3,3500,99],["11152441",50,19,1,2,2,8700,57],["11152441",50,19,2,3,3,3000,57],["11234553",53,26,1,21,36,25200,91],["11259091",54,4,1,2,2,14500,114],["11259091",54,4,2,3,3,3500,114],["11259225",54,16,1,2,2,17400,61],["11259225",54,16,2,3,3,3500,61],["11305275",55,7,2,3,3,3500,57],["11319291",56,9,1,2,2,37500,63],["11347123",57,8,1,4,7,37350,63],["11373961",57,7,2,3,3,-3500,142],["11421845",59,22,1,14,31,16200,74],["11421845",59,22,6,17,32,2000,74],["11438933",60,27,4,34,54,155500,69],["11439213",60,33,2,35,55,79000,58],["11439213",60,33,4,36,56,19900,58],["11439213",60,33,8,37,57,5950,58],["11446985",60,34,2,7,10,41900,69],["11446985",60,34,1,21,36,8100,69],["11535367",62,13,4,38,58,70000,70],["11535367",62,13,2,39,59,0,70],["11540143",63,13,1,2,2,37350,71],["11540143",63,13,1,2,16,14193,71],["11540143",63,13,1,15,30,1450,71],["11555167",63,28,1,2,2,43000,109],["11583831",65,20,1,14,29,13500,74],["11606767",66,32,1,40,60,19500,96],["11606767",66,32,1,41,61,2900,96],["11611219",67,2,1,2,2,12800,75],["11611219",67,2,2,3,3,3000,75],["11623473",68,35,1,14,62,42000,78],["11643933",69,21,1,2,2,5800,77],["11643933",69,21,2,3,3,3500,77],["11660439",69,36,1,42,63,10000,75],["11660439",69,36,3,43,64,8000,75],["11660439",69,36,6,44,65,2400,75],["11692279",70,37,1,21,36,7200,84],["11716929",71,31,1,21,36,9600,77],["11729181",72,31,1,21,36,9600,98],["11736135",72,7,4,8,66,8000,98],["11736135",72,7,1,21,36,17400,98],["11755205",73,28,1,21,36,39600,109],["11755205",73,28,1,42,63,6900,109],["11780451",74,5,1,21,36,13500,95],["11781609",74,26,1,21,36,18900,122],["11782105",74,24,1,21,36,22410,257],["11816771",75,1,1,15,30,2900,104],["11816771",75,1,1,21,36,40500,104],["11867289",76,0,0,12,22,95000,77],["11867369",76,17,1,2,2,8700,99],["11867369",76,17,2,3,3,3500,99],["11867653",76,19,1,2,2,8700,82],["11867653",76,19,2,3,3,3000,82],["11894719",77,38,1,21,36,11600,80],["11894719",77,38,9,45,67,1000,80],["11894979",77,39,4,46,68,67500,78],["11894979",77,39,1,21,36,7200,78],["11900083",77,30,1,21,36,25200,129],["11921053",78,34,1,21,69,6700,106],["11947665",79,4,1,2,2,14500,114],["11947665",79,4,2,3,3,3500,114],["11947759",79,16,1,2,2,17400,83],["11947759",79,16,2,3,3,3500,83],["11973421",80,15,1,21,69,14940,-1],["11989873",81,29,1,21,36,36000,238],["12022559",82,8,1,21,36,37350,86],["12146307",85,40,1,21,69,7200,99],["12158339",86,13,1,2,2,37350,94],["12158339",86,13,1,2,16,14193,94],["12158339",86,13,1,15,30,1450,94],["12162837",86,41,7,47,70,1500,159],["12164625",86,42,1,33,71,5800,89],["12164625",86,42,1,41,72,1400,89],["12164625",86,42,1,48,73,1450,89],["12184021",86,43,1,21,69,14400,91],["12189821",87,32,1,33,71,10500,96],["12189821",87,32,1,48,74,8700,96],["12189821",87,32,1,41,72,8700,96],["12189821",87,32,6,44,75,2000,96],["12194855",88,20,1,21,36,13500,95],["12211357",90,2,1,2,2,12800,96],["12211357",90,2,2,3,3,3000,96],["12230371",90,7,1,21,36,43500,141],["12260805",92,21,2,3,3,3500,98],["12260805",92,21,1,21,36,5800,98],["12261577",92,9,1,21,36,22500,129],["12261577",92,9,1,15,30,2900,129],["12270935",92,5,1,21,36,13500,95],["12314409",93,31,1,21,36,12000,119],["12321245",94,4,1,2,2,14500,114],["12321245",94,4,2,3,3,3500,114],["12335227",94,44,1,21,69,23000,95],["12335227",94,44,1,49,76,3000,95],["12335227",94,44,1,50,77,3500,95],["12335227",94,44,1,51,78,3500,95],["12335227",94,44,1,41,79,5800,95],["12353843",95,14,3,10,80,5500,144],["12353843",95,14,3,11,81,5000,144],["12353843",95,14,1,21,69,28800,144],["12411313",97,30,1,21,36,25200,129],["12413267",99,26,1,21,69,25200,122],["12498175",99,44,4,52,82,17000,130],["12498175",99,44,6,44,83,2000,130],["12512331",99,0,0,12,22,95000,101],["12512337",99,17,1,2,2,8700,121],["12512337",99,17,2,3,3,3500,121],["12512363",99,19,1,2,2,8700,121],["12512363",99,19,2,3,3,3000,121],["12515929",99,32,1,41,72,24070,254],["12518361",99,37,1,21,36,12000,158],["12533361",99,35,1,14,62,44100,106],["12533897",99,45,1,21,69,4800,104],["12580849",100,16,2,3,3,3500,123],["12580849",100,16,1,21,69,17400,123],["12635297",102,29,1,21,36,36000,166],["12666015",103,8,1,21,36,37350,125],["12699121",104,46,4,53,84,25000,105],["12699121",104,46,1,21,69,2400,105],["12775097",106,44,1,21,69,20700,131],["12777207",106,17,1,15,30,1450,129],["12804233",107,47,1,21,69,23600,145],["12831881",108,13,1,2,2,37350,166],["12831881",108,13,1,2,16,14193,166],["12831881",108,13,1,15,30,1450,166],["12847575",108,47,1,21,69,60000,145],["12863467",109,5,1,2,2,13500,237],["12864215",109,45,2,3,3,3900,125],["12864215",109,45,1,21,69,13800,125],["12864215",109,45,10,54,85,13800,125],["12867463",109,48,4,55,86,189000,142],["12867463",109,48,1,21,69,44000,142],["12867463",109,48,6,56,87,0,142],["12881369",110,20,1,21,36,13500,134],["12895481",110,14,1,21,69,14400,144],["12895481",110,14,1,15,30,2900,144],["12934689",111,2,1,2,2,12800,135],["12934689",111,2,2,3,3,3000,135],["12962515",112,21,2,3,3,3500,136],["12962515",112,21,1,21,36,5800,136],["12962753",112,9,1,21,36,22500,161],["13011411",114,1,1,15,30,2900,139],["13011411",114,1,1,21,69,40500,139],["13033835",114,28,1,21,69,19800,145],["13085541",115,4,1,2,2,14500,131],["13085541",115,4,2,3,3,3500,131],["13096461",115,35,1,14,62,44100,131],["13130847",116,49,1,21,69,2400,262],["13130847",116,49,1,57,88,2600,262],["13130847",116,49,1,48,89,2700,262],["13135523",116,7,1,21,36,87000,180],["13163723",117,30,1,21,36,25200,175],["13211385",118,0,0,12,22,95000,122],["13211463",118,17,1,2,2,8700,127],["13211463",118,17,2,3,3,3500,127],["13211965",118,19,1,2,2,8700,127],["13211965",118,19,2,3,3,3000,127],["13289857",120,50,6,58,90,327000,119],["13289857",120,50,6,59,91,169200,119],["13289857",120,50,6,60,92,93075,119],["13289877",120,50,4,55,93,450000,119],["13289877",120,50,1,21,69,94500,119],["13289877",120,50,5,61,94,0,119],["13289877",120,50,6,62,95,11700,119],["13319915",120,51,1,21,69,21600,142],["13350273",121,33,2,35,55,711000,125],["13350273",121,33,4,36,56,179100,125],["13350273",121,33,8,37,57,53550,125],["13362767",122,16,2,3,3,3500,129],["13362767",122,16,1,21,69,17400,129],["13406287",123,47,1,21,69,42000,164],["13431971",124,8,1,21,36,37350,134],["13444635",124,44,1,21,69,20700,238],["13444635",124,44,1,48,89,1450,238],["13444635",124,44,1,33,71,1450,238],["13474713",125,40,1,57,96,7200,128],["13500559",126,10,1,2,2,22500,154],["13523037",127,15,1,21,69,14940,-1],["13524605",127,35,1,14,62,44100,141],["13526649",127,39,1,21,69,7200,129],["13526649",127,39,1,49,76,6000,129],["13526649",127,39,1,48,97,1350,129],["13526649",127,39,1,33,98,1750,129],["13578615",128,28,1,21,69,26400,145],["13579179",128,28,1,21,69,26400,145],["13580097",128,32,1,33,99,28710,254],["13597815",129,28,6,44,65,2100,145],["13608733",130,13,1,2,2,37350,140],["13608733",130,13,1,2,16,14193,140],["13608733",130,13,1,15,30,1450,140],["13615657",130,47,1,21,69,60000,164],["13655111",132,20,1,21,36,13500,140],["13686489",133,2,1,2,2,12800,142],["13686489",133,2,2,3,3,3000,142],["13700101",134,52,1,21,69,21801,134],["13700859",134,33,1,21,69,36000,238],["13700859",134,33,1,48,89,11600,238],["13700859",134,33,4,52,100,17000,238],["13701141",134,9,1,21,36,22500,161],["13715507",135,21,2,3,3,3500,143],["13715507",135,21,1,21,36,5800,143],["13730741",135,5,1,2,2,13500,237],["13782615",137,7,1,21,69,87000,180],["13810043",138,4,1,2,2,14500,258],["13810043",138,4,2,3,3,3500,258],["13833519",139,53,1,33,71,15660,165],["13870551",140,30,1,21,36,25200,175],["13909477",141,54,1,33,71,8700,142],["13909533",141,45,2,3,3,3900,155],["13909533",141,45,1,21,69,13800,155],["13909603",141,55,1,33,99,5800,151],["13954841",142,0,0,12,22,95000,142],["13955311",142,19,1,2,2,8700,147],["13955311",142,19,2,3,3,3000,147],["13975913",142,17,1,2,2,8700,147],["13975913",142,17,2,3,3,3500,147],["14032963",143,16,2,3,3,3500,148],["14032963",143,16,1,21,69,17400,148],["14049193",143,56,1,21,101,7200,144],["14049193",143,56,1,48,102,2700,144],["14049193",143,56,1,33,71,2900,144],["14049193",143,56,1,51,103,3500,144],["14049193",143,56,1,49,76,3000,144],["14049193",143,56,1,51,104,3500,144],["14049193",143,56,3,11,81,3600,144],["14049193",143,56,3,6,105,10000,144],["14050477",143,47,1,21,69,72000,185],["14108449",145,47,1,21,69,60000,185],["14108797",145,31,1,21,36,12000,137],["14117607",145,57,1,21,69,14400,231],["14153505",146,8,1,21,36,37350,150],["14285283",149,20,1,21,36,13500,156],["14318848",151,2,1,2,2,12800,159],["14318848",151,2,2,3,3,3000,159],["14356048",152,21,2,3,3,3500,159],["14356048",152,21,1,21,36,5800,159],["14356330",152,9,1,21,36,22500,177],["14356330",152,9,1,15,30,2900,177],["14408252",153,4,2,3,3,3500,163],["14408252",153,4,1,21,69,14500,163],["14470978",155,28,1,21,69,33000,255],["14484360",156,30,1,21,36,25200,175],["14484360",156,30,1,21,106,-172,175],["14543658",157,0,0,12,22,95000,158],["14543700",157,17,1,2,2,8700,165],["14543700",157,17,2,3,3,3500,165],["14543854",157,19,1,2,2,8700,165],["14543854",157,19,2,3,3,3000,165],["14616234",159,58,1,63,107,1200,248],["14616234",159,58,1,64,103,1400,248],["14616234",159,58,1,63,108,1600,248],["14616234",159,58,1,65,109,26000,248],["14628126",160,5,1,2,2,16200,237],["14628186",160,57,1,57,88,14400,231],["14628186",160,57,1,15,30,2900,231],["14646458",160,22,6,17,32,2000,204],["14646458",160,22,1,21,69,16200,204],["14646540",160,49,1,21,69,21600,170],["14646710",160,48,1,21,69,46200,238],["14646776",160,47,1,21,69,60000,204],["14646806",160,6,1,2,49,23400,238],["14646822",160,1,1,15,30,2900,173],["14646822",160,1,1,21,69,40500,173],["14648280",160,58,1,66,104,1600,242],["14656768",161,16,2,3,3,3500,168],["14656768",161,16,1,21,69,17400,168],["14729664",162,44,1,21,69,20700,238],["14729664",162,44,1,48,89,2900,238],["14729664",162,44,1,67,107,3000,238],["14729664",162,44,1,64,103,3500,238],["14729668",162,38,1,21,36,14500,164],["14729668",162,38,9,45,67,1000,164],["14729668",162,38,9,68,110,500,164],["14747596",163,52,1,21,69,21600,238],["14747922",163,35,1,14,62,44100,179],["14837354",165,59,1,21,69,7200,167],["14837354",165,59,1,57,111,2400,167],["14837354",165,59,1,33,112,1450,167],["14868084",166,47,1,21,69,60000,204],["14868990",166,29,1,21,36,-36000,166],["14949062",169,5,6,69,113,5000,237],["14968544",170,20,1,21,36,13500,179],["14973484",170,45,2,3,3,3900,186],["14973484",170,45,1,21,114,34500,186],["14977216",170,33,1,33,99,8700,179],["14977216",170,33,1,48,89,2900,179],["14977216",170,33,1,57,88,36000,179],["14977216",170,33,6,70,115,2000,179],["14977216",170,33,6,71,116,1000,179],["14978814",170,55,1,33,99,8700,237],["14978814",170,55,1,72,117,7200,237],["14978814",170,55,6,70,115,1600,237],["14978814",170,55,6,71,116,800,237],["14978814",170,55,2,73,118,0,237],["14978814",170,55,6,44,119,1000,237],["14978814",170,55,1,48,89,1350,237],["15010360",171,39,1,72,117,14400,179],["15013478",172,2,1,2,2,12800,180],["15013478",172,2,2,3,3,3000,180],["15014442",172,52,2,74,120,7900,180],["15028714",173,44,5,9,121,50000,182],["15028778",173,21,2,3,3,3500,182],["15028778",173,21,1,21,36,5800,182],["15071318",174,60,1,21,69,7200,178],["15071318",174,60,4,53,122,15000,178],["15071318",174,60,6,44,123,3500,178],["15071406",174,48,1,21,69,66000,184],["15111890",176,50,3,43,124,900,240],["15111890",176,50,3,6,105,7600,240],["15111890",176,50,3,75,125,6800,240],["15111890",176,50,3,76,126,7200,240],["15112046",176,57,1,21,69,28800,231],["15112046",176,57,3,10,80,2640,231],["15112046",176,57,3,6,127,1100,231],["15122674",176,25,1,21,69,21600,209],["15122674",176,25,6,44,128,3000,209],["15127402",177,4,2,3,3,3500,185],["15127402",177,4,1,21,69,14500,185],["15185174",178,30,1,21,36,25200,187],["15189152",178,47,1,21,69,60000,204],["15189152",178,47,6,70,129,3000,204],["15225072",178,61,1,57,88,7200,235],["15263238",179,17,1,2,2,8700,188],["15263238",179,17,2,3,3,3500,188],["15328936",180,7,1,21,36,52200,247],["15343234",181,59,1,33,99,2436,181],["15343234",181,59,1,77,130,2850,181],["15343234",181,59,1,1,6,598,181],["15362550",181,12,2,3,3,3900,247],["15366326",182,12,2,3,3,3900,247],["15366958",182,9,1,21,36,30000,189],["15366958",182,9,1,15,30,2900,189],["15366974",182,62,1,21,69,37800,238],["15367108",182,44,1,21,69,20700,189],["15367108",182,44,1,77,130,8550,189],["15367314",182,1,1,15,30,2900,194],["15367314",182,1,1,21,69,40500,194],["15378502",182,58,1,77,130,2900,238],["15378502",182,58,1,78,131,9300,238],["15378502",182,58,1,65,109,56238,238],["15378502",182,58,1,48,89,2900,238],["15378502",182,58,6,71,116,1000,238],["15378502",182,58,6,70,132,400,238],["15378502",182,58,6,70,133,100,238],["15378502",182,58,6,70,134,1200,238],["15379722",182,28,1,77,130,2850,255],["15379722",182,28,6,44,65,600,255],["15389752",182,0,0,12,22,-47500,231],["15395610",183,16,2,3,3,3500,190],["15395610",183,16,1,21,69,17400,190],["15420830",184,29,1,21,36,36000,192],["15422796",184,35,1,14,62,44100,190],["15473768",185,28,1,72,117,19800,255],["15473768",185,28,1,79,135,3000,255],["15534066",187,37,1,77,130,4410,195],["15534066",187,37,1,78,131,1116,195],["15534066",187,37,1,48,136,0,195],["15556550",187,52,1,21,69,16800,199],["15586914",188,47,1,21,69,24000,225],["15618274",189,33,1,72,117,7200,199],["15618998",189,58,1,78,131,13330,244],["15669232",190,31,1,72,117,7200,240],["15669258",190,63,1,72,117,34500,210],["15698302",191,47,1,21,69,60000,225],["15729592",193,20,1,21,36,13500,201],["15751384",194,2,1,2,2,12800,202],["15751384",194,2,2,3,3,3000,202],["15752786",194,52,2,74,120,7900,238],["15803630",195,35,1,21,69,44100,218],["15803836",196,33,1,72,117,36000,204],["15803836",196,33,1,33,99,8700,204],["15804190",197,38,1,21,69,8700,199],["15804546",197,9,1,21,69,22500,204],["15866954",197,50,1,72,117,31500,200],["15866954",197,50,1,21,69,31500,200],["15880940",197,8,1,21,36,22410,204],["15903248",198,4,2,3,3,3500,258],["15903248",198,4,1,21,69,14500,258],["15929434",199,28,1,21,69,19800,255],["15959204",200,47,1,21,69,60000,225],["15959234",200,52,1,21,69,14400,206],["15959426",200,58,1,33,99,8700,206],["16068498",202,17,1,2,2,8700,207],["16068498",202,17,2,3,3,3500,207],["16115090",203,12,2,3,3,3900,247],["16144446",203,64,1,21,69,12600,238],["16144446",203,64,1,72,117,12600,238],["16144446",203,64,2,74,120,7900,238],["16144446",203,64,5,61,137,0,238],["16175674",204,2,4,53,138,15000,205],["16235334",205,50,3,6,139,3800,229],["16235334",205,50,3,80,140,3950,229],["16235334",205,50,3,81,141,2850,229],["16235334",205,50,1,21,69,25200,229],["16235334",205,50,1,72,117,25200,229],["16235334",205,50,6,62,95,11700,229],["16237292",205,44,1,21,69,28800,211],["16238448",205,48,1,21,69,46200,211],["16239064",205,59,1,21,69,14400,208],["16239064",205,59,1,48,89,2900,208],["16247034",205,31,1,21,69,7200,240],["16248406",205,10,1,21,69,22500,219],["16259612",205,14,3,10,80,5500,252],["16259612",205,14,3,11,81,5000,252],["16259612",205,14,3,82,142,5000,252],["16259612",205,14,3,83,143,5500,252],["16342790",207,28,1,21,69,19800,255],["16342804",207,47,1,21,69,60000,237],["16342924",207,5,1,2,2,8100,237],["16351246",207,57,1,21,69,36000,252],["16370976",208,63,1,72,117,48300,216],["16413734",209,6,1,21,69,23400,216],["16413734",209,6,1,15,30,1450,216],["16453294",210,52,1,21,69,21600,216],["16488266",211,1,1,72,117,16200,224],["16488366",211,9,1,21,69,30000,219],["16488518",211,17,1,2,2,8700,219],["16488518",211,17,2,3,3,3500,219],["16510278",211,20,1,21,36,13500,219],["16519902",211,65,1,72,117,2400,213],["16519902",211,65,1,21,69,2400,213],["16551086",212,45,1,21,69,27600,237],["16551086",212,45,6,62,95,1990,237],["16551086",212,45,2,7,144,38700,237],["16564710",212,66,7,84,145,42000,211],["16569612",213,52,2,74,120,7900,220],["16612690",214,4,2,3,3,3500,258],["16612690",214,4,1,21,69,17400,258],["16612828",214,33,1,72,117,36000,220],["16612828",214,33,1,48,89,8700,220],["16612828",214,33,6,71,116,0,220],["16613248",214,67,1,21,69,24840,224],["16613726",214,30,1,21,36,25200,220],["16614116",214,35,1,21,69,44100,218],["16614356",214,44,6,70,115,3600,220],["16614356",214,44,6,71,116,1800,220],["16614422",214,47,1,21,69,60000,237],["16651126",215,20,1,21,36,16200,223],["16754042",217,59,1,77,130,2850,219],["16754042",217,59,1,48,89,5800,219],["16773066",220,48,1,21,69,46200,228],["16876618",220,31,1,21,69,7200,253],["16876914",220,5,1,2,2,13500,237],["16931212",220,50,3,80,140,1580,229],["16931212",220,50,3,81,141,4750,229],["16931212",220,50,3,82,142,5000,229],["16931212",220,50,1,21,69,31500,229],["16931212",220,50,1,72,117,31500,229],["16953042",221,12,2,3,3,3900,247],["16991202",222,64,2,74,120,7900,229],["16994366",222,8,1,21,69,22410,229],["16994674",222,28,1,21,69,19800,255],["17000610",225,9,1,21,69,30000,233],["17099668",225,47,1,21,69,60000,251],["17099942",225,64,1,21,69,18900,233],["17099942",225,64,1,72,117,12600,233],["17105198",225,66,7,84,145,98000,243],["17106102",225,37,1,77,130,4410,233],["17106102",225,37,6,44,65,600,233],["17128416",225,17,1,2,2,8700,233],["17128416",225,17,2,3,3,3500,233],["17135880",225,33,1,72,117,34500,233],["17135880",225,33,1,85,146,0,233],["17197200",226,52,1,21,69,28800,245],["17197260",226,44,1,21,69,7200,234],["17197260",226,44,1,48,89,8700,234],["17197260",226,44,1,85,147,1300,234],["17225068",227,1,1,21,69,40500,261],["17225690",227,68,1,21,69,34500,249],["17228616",227,22,6,17,32,2000,234],["17228616",227,22,1,21,69,16200,234],["17241296",227,69,5,9,148,30000,246],["17290044",229,57,1,21,69,36000,256],["17290044",229,57,1,85,147,2600,256],["17302416",229,49,1,72,117,24000,262],["17302416",229,49,1,21,69,2400,262],["17324518",229,70,7,86,149,56700,250],["17324518",229,70,2,16,150,9000,250],["17379680",230,50,1,21,69,31500,240],["17397430",231,31,1,21,69,7200,260],["17413684",231,47,1,21,69,60000,251],["17418502",231,45,1,72,117,27600,241],["17442320",232,52,2,74,120,7900,239],["17521716",235,30,8,87,151,344,217],["17543076",236,28,1,21,69,19800,255],["17546528",236,5,6,69,113,7000,259]]};
+function historiqueAncien() {
+  const z = AX2024_BRUT;
+  if (!z || !Array.isArray(z.L)) return [];
+  return z.L.map((r) => ({
+    f: String(r[0]), d: z.D[r[1]], c: z.C[r[2]], cat: z.K[r[3]],
+    p: z.P[r[4]], t: z.T[r[5]], ht: r[6] / 100, pay: r[7] >= 0 ? z.D[r[7]] : "",
+  }));
+}
+
 /* ------------------------------------------- chargement des données publiées
    data.json est publié en clair par le scénario Make. Il contient les lignes
    telles que les APIs les rendent : c'est la page qui classe et qui agrège.
@@ -2171,8 +2293,13 @@ function adopterBrut(brut) {
      qu'un vieil impayé enfin réglé disparaît bien de la liste. */
   const frais = brut.axonaut || [];
   const vues = new Set(frais.map((l) => String(l.f)));
-  const lignes = (brut.axonautHistorique || [])
-    .filter((l) => !vues.has(String(l.f)))
+  const socle = (brut.axonautHistorique || []).filter((l) => !vues.has(String(l.f)));
+  /* Une facture de 2024 qui serait aussi publiée par le scénario — un vieil
+     impayé, par exemple — appartient au scénario : la version figée s'efface. */
+  const publiees = new Set([...vues, ...socle.map((l) => String(l.f))]);
+  const lignes = historiqueAncien()
+    .filter((l) => !publiees.has(l.f))
+    .concat(socle)
     .concat(frais);
 
   /* Le lot frais ne suffit pas pour les impayés. Axonaut n'a pas de filtre sur
@@ -2199,10 +2326,10 @@ function adopterBrut(brut) {
         }))
     : [];
   const etatPaiement = (l, f) => {
-    const d = jour(l.pay);
-    if (!impayes) return d;
+    const d = jourSur(l.pay);
+    if (!impayes) return d === null ? PAYE_SANS_DATE : d;
     if (impayes.has(f)) return IMPAYE;
-    return d >= 0 ? d : PAYE_SANS_DATE;
+    return d === null ? PAYE_SANS_DATE : d;
   };
 
   for (const l of lignes) {
@@ -3313,6 +3440,13 @@ demarrerEnClair();
      Le mois en cours remplace alors celui figé dans la page, et devient le mois
      de référence, sauf si vous en avez déjà choisi un autre. */
   function publieLe(g) { return typeof publie === "function" ? publie(g) : ""; }
+  /* Le tableau de bord a besoin des ventes par article, mois par mois, pour
+     calculer les produits lancés et les produits en chute sur une fenêtre
+     glissante. MOIS mêle le référentiel figé à la page et ce que les tickets
+     publient ; PARTIEL dit quels mois sont incomplets. */
+  PARTAGE.articlesMensuels = function () { return { mois: MOIS, partiel: PARTIEL }; };
+  if (PARTAGE.majProduits) PARTAGE.majProduits();
+
   PARTAGE.simDonnees = function (d) {
     var v = (d && d.ventes) || {}, enCours = null, change = false;
     Object.keys(v).sort().forEach(function (m) {
@@ -3339,6 +3473,7 @@ demarrerEnClair();
     chargerMois(E.mois);
     $("ca").value = Math.round(E.ca); $("ca-r").value = E.ca;
     batirMois(); dessinerSpark(); rendre();
+    if (PARTAGE.majProduits) PARTAGE.majProduits();
   };
 
   dessinerSpark();
