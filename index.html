@@ -3318,10 +3318,38 @@ demarrerEnClair();
     return q ? c / q : 0;
   }
 
+  /* Les articles « formule » de la période de référence, fondus en un seul.
+     L'offre a changé de nom en juillet 2026 — FORMULE TOAST est devenue
+     FORMULE SALE — et juillet contient les deux. C'est la même offre et
+     l'onglet répond à une seule question : ce que coûte une formule.
+
+     Avant, le code cherchait FORMULE SALE et elle seule, et repartait sans
+     rien effacer quand il ne la trouvait pas. De mars à juin, où seule
+     FORMULE TOAST existe, l'onglet affichait donc en silence les chiffres de
+     la période consultée juste avant. Un tableau qui ne se vide pas ment plus
+     sûrement qu'un tableau vide. */
+  function formulesDeLaPeriode() {
+    var lot = PRODUITS.filter(function (p) { return /^FORMULE\b/i.test(p.n) && p.v && p.q > 0; });
+    if (!lot.length) return null;
+    var q = 0, ca = 0, parRecette = {};
+    lot.forEach(function (p) {
+      q += p.q; ca += p.ca;
+      p.v.forEach(function (o) { parRecette[o[0]] = (parRecette[o[0]] || 0) + o[1]; });
+    });
+    return { noms: lot.map(function (p) { return p.n; }).sort(), q: q, ca: ca,
+      v: Object.keys(parRecette).map(function (k) { return [k, parRecette[k]]; })
+        .sort(function (a, b) { return b[1] - a[1]; }) };
+  }
+
   function dessinerFormule() {
-    var f = null;
-    for (var i = 0; i < PRODUITS.length; i++) if (PRODUITS[i].n === "FORMULE SALE") f = PRODUITS[i];
-    if (!f) return;
+    var f = formulesDeLaPeriode();
+    if (!f) {
+      $("formule").textContent = "";
+      $("formule-note").innerHTML = "<p><b>Aucune formule vendue " + dePer(E.per) + ".</b> "
+        + "Le catalogue de cette période ne contient aucun article « formule » rattaché à des "
+        + "recettes — rien à chiffrer ici. Choisissez une période où la formule était vendue.</p>";
+      return;
+    }
     var mB = coutMoyen(BOISSONS), mD = coutMoyen(DESSERTS);
     var prixU = f.ca / f.q, tb = $("formule"), total = 0;
     tb.textContent = "";
@@ -3348,7 +3376,8 @@ demarrerEnClair();
       + " de marge brute.</b> Le salé seul en représente " + pct(saleMoyen / prixU)
       + " : la boisson et le dessert offerts ajoutent " + eur(mB + mD, 2) + ". Sur les " + f.q
       + " formules " + dePer(E.per) + (estPartielPer(E.per) ? " (" + per(E.per).jours + " premiers jours)" : "")
-      + ", cela fait " + eur(total) + " de matière et " + eur(f.ca - total) + " de marge.</p>"
+      + ", cela fait " + eur(total) + " de matière et " + eur(f.ca - total) + " de marge. "
+      + "Vendues sous " + (f.noms.length > 1 ? "les noms " : "le nom ") + f.noms.join(" et ") + ".</p>"
       + "<p>Ce n'est pas la boisson qui coûte, c'est le dessert : " + eur(mB, 2) + " contre "
       + eur(mD, 2) + ". Offrir un café ne vous coûte presque rien ; offrir une part de cake, "
       + Math.round(mD / mB) + " fois plus.</p>";
@@ -3467,10 +3496,19 @@ demarrerEnClair();
     /* Le shop ouvre tous les jours : 30,44 jours par mois en moyenne. Les CA
        par jour viennent tous deux des ventes par article, même source. */
     var clos = MOIS_CLOS[MOIS_CLOS.length - 1];
+    /* Les rythmes réels auxquels comparer le point mort journalier. La période
+       de référence vient en tête quand ce n'est ni le dernier mois clos ni la
+       période en cours : la ligne parlait d'août alors qu'on lisait juin. */
+    var anc = [];
+    if (E.per !== cleDe(clos, GRAN) && E.per !== PER_EN_COURS && X.jours)
+      anc.push([libellePer(E.per), caPer(E.per) / X.jours]);
+    anc.push([NOM_MOIS[+clos.slice(5, 7) - 1], caDuMois(clos) / joursDansMois(clos)]);
+    if (EN_COURS) anc.push([NOM_MOIS[+EN_COURS.slice(5, 7) - 1] + " en cours",
+      caDuMois(EN_COURS) / PARTIEL[EN_COURS].jours]);
     $("m-pm-det").textContent = pm.ca === null ? "hors d'atteinte"
-      : eur(pm.ca / (30.44 * n)) + " par jour, ouvert tous les jours. " + majuscule(NOM_MOIS[+clos.slice(5, 7) - 1]) + " a fait "
-        + eur(caDuMois(clos) / joursDansMois(clos)) + " par jour"
-        + (EN_COURS ? ", " + NOM_MOIS[+EN_COURS.slice(5, 7) - 1] + " en cours " + eur(caDuMois(EN_COURS) / PARTIEL[EN_COURS].jours) : "") + ".";
+      : eur(pm.ca / (30.44 * n)) + " par jour, ouvert tous les jours. "
+        + majuscule(anc[0][0]) + " a fait " + eur(anc[0][1]) + " par jour"
+        + anc.slice(1).map(function (a) { return ", " + a[0] + " " + eur(a[1]); }).join("") + ".";
     /* Combien de mois la période porte vraiment : un semestre relevé sur quatre
        mois compare quatre mois de charges à quatre mois de recettes. */
     var reduite = X.entiere ? "" : " Relevé sur " + n + " des " + TAILLE[X.gran] + " mois, "
