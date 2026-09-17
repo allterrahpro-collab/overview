@@ -681,7 +681,7 @@ a{color:var(--roast)}
     <button type="button" class="linkbtn" id="p-reset">Repartir des valeurs observées</button>
   </div>
   <p class="hypmsg" id="p-hyp-msg" role="alert"></p>
-  <p class="hypmsg">Enregistrés : équipe, provision, charges fixes, coût supposé, commission et prix d'achat. Le mois de référence et le curseur de CA servent à explorer : ils ne s'enregistrent pas.</p>
+  <p class="hypmsg">Enregistrés : équipe, provision, charges fixes, coût supposé, commission et prix d'achat. La période de référence et le curseur de CA servent à explorer : ils ne s'enregistrent pas.</p>
   <details class="hyphisto" id="p-histo" hidden><summary>Qui a modifié quoi, et quand</summary><ol id="p-histo-liste"></ol></details>
 </div>
 <div class="grille">
@@ -697,9 +697,9 @@ a{color:var(--roast)}
       <div class="bloc">
         <h2>Chiffre d'affaires</h2>
         <div class="mois" id="mois" role="group" aria-label="Mois de référence"></div>
-        <p class="aide" style="grid-column:auto; margin:0 0 12px">Le mois choisi fixe le mix de vente : ce qui a réellement été servi, donc le coût matière. Le curseur fait ensuite varier le volume à mix constant.</p>
+        <p class="aide" style="grid-column:auto; margin:0 0 12px" id="mois-aide">La période choisie — celle de la barre du haut — fixe le mix de vente : ce qui a réellement été servi, donc le coût matière. Les charges fixes sont portées au même nombre de mois. Le curseur fait ensuite varier le volume à mix constant.</p>
         <div class="levier">
-          <label for="ca">CA mensuel HT</label>
+          <label for="ca" id="ca-lab">CA mensuel HT</label>
           <input type="number" id="ca" step="100" min="0" max="60000">
           <input type="range" id="ca-r" min="8000" max="45000" step="100">
           <div class="aide" id="ca-aide"></div>
@@ -765,7 +765,7 @@ a{color:var(--roast)}
       <p class="verdict" id="verdict"></p>
       <p class="verdict-note" id="verdict-note"></p>
       <div class="jauge" id="jauge"></div>
-      <p class="jauge-legende">Le trait cuivré marque le CA qui annule l'EBITDA. Les repères gris situent votre activité réelle ; en italique, le mois en cours projeté.</p>
+      <p class="jauge-legende">Le trait cuivré marque le CA qui annule l'EBITDA. Les repères gris situent votre activité réelle ; en italique, la période en cours projetée.</p>
       <div class="note" id="p-encours" hidden></div>
     </div>
 
@@ -2201,17 +2201,22 @@ document.querySelectorAll(".periodbar .seg button").forEach((b) => b.addEventLis
     const k = pkeyOf(Math.round((old - EPOCH) / DAY), GRAN);
     PKEY = CACHE[GRAN].keys.includes(k) ? k : null;
   }
-  renderPeriodSelect(); render();
+  renderPeriodSelect(); render(); versSimulateur();
 }));
-$("period").addEventListener("change", (e) => { PKEY = e.target.value; renderPeriodSelect(); render(); });
+$("period").addEventListener("change", (e) => { PKEY = e.target.value; renderPeriodSelect(); render(); versSimulateur(); });
 $("prev").addEventListener("click", () => {
   const k = CACHE[GRAN].keys, i = k.indexOf(PKEY);
-  if (i > 0) { PKEY = k[i - 1]; renderPeriodSelect(); render(); }
+  if (i > 0) { PKEY = k[i - 1]; renderPeriodSelect(); render(); versSimulateur(); }
 });
 $("next").addEventListener("click", () => {
   const k = CACHE[GRAN].keys, i = k.indexOf(PKEY);
-  if (i < k.length - 1) { PKEY = k[i + 1]; renderPeriodSelect(); render(); }
+  if (i < k.length - 1) { PKEY = k[i + 1]; renderPeriodSelect(); render(); versSimulateur(); }
 });
+/* Le simulateur de point mort suit la barre : même granularité, même période.
+   Les clés sont les mêmes des deux côtés (M2026-09, Q2026-3, S2026-2). */
+function versSimulateur() {
+  if (PARTAGE.simPeriode) PARTAGE.simPeriode({ gran: GRAN, cle: PKEY });
+}
 
 /* --------------------------------------------------- sections dépliables
    Tout est replié au départ, à chaque visite : la page ne garde rien dans le
@@ -2256,6 +2261,7 @@ function boot() {
   $("wrap").hidden = false;
   /* Le simulateur de point mort reçoit le mois en cours et l'historique frais. */
   if (PARTAGE.simDonnees) PARTAGE.simDonnees({ ventes: DATA.ventesMois || {}, histo: histoMensuel() });
+  versSimulateur();
 }
 /* CA mensuel net HT (Square) des mois clos entièrement couverts par les données. */
 function histoMensuel() {
@@ -2419,16 +2425,38 @@ function adopterBrut(brut) {
      publiés par Make depuis le 11/09/2026) : quantités vendues et CA net de TVA,
      de remises et d'offerts, avant retours. Ce sont les mesures du rapport
      Square des mois clos — vérifié à l'identique, article par article, sur août
-     et sur le 1er-10 septembre. La journée du rafraîchissement, incomplète, est
-     écartée ; un mois n'est « complet » que si les tickets le couvrent en entier. */
+     et sur le 1er-10 septembre.
+
+     La période couverte se lit dans les tickets, jamais dans l'heure du
+     rafraîchissement : ce sont deux choses différentes, et les confondre a
+     coûté cher. Le 17/09, Square rendait au scénario Make 3 500 commandes au
+     lieu de 3 664 — un plafond du module, silencieux — et le flux s'arrêtait
+     au 15 à la mi-journée. La page divisait alors quatorze jours de recettes
+     par seize jours de calendrier : 608 € par jour au lieu de 695. Depuis, le
+     scénario rapatrie tout, mais la règle reste : on ne compte que les jours
+     que les tickets couvrent réellement. La journée du rafraîchissement est
+     écartée, celle d'avant aussi si le flux s'arrête plus tôt — dans ce cas
+     c'est une journée coupée en deux, pas une journée de vente. Un mois n'est
+     « complet » que si les tickets vont du 1er au dernier jour. */
+  const jourAvant = (d) => new Date(Date.parse(d + "T00:00:00Z") - 864e5).toISOString().slice(0, 10);
   const genereJour = String(brut.genere || "").slice(0, 10);
-  const parMois = {};
-  let premierJour = null;
+  const veille = genereJour ? jourAvant(genereJour) : "";
+  let premierJour = null, dernierJour = null;
   for (const o of brut.squareBrut || []) {
     const j = (o.j || "").slice(0, 10);
     if (!j) continue;
     if (premierJour === null || j < premierJour) premierJour = j;
-    if (o.n === undefined || (genereJour && j >= genereJour)) continue;
+    if (j <= veille && (dernierJour === null || j > dernierJour)) dernierJour = j;
+  }
+  /* Le shop ouvre tous les jours : un dernier jour antérieur à la veille du
+     relevé ne signifie pas relâche, mais flux interrompu au milieu de ce
+     jour-là. On recule d'un cran plutôt que de compter une demi-journée. */
+  const limite = dernierJour && dernierJour < veille ? jourAvant(dernierJour) : dernierJour;
+
+  const parMois = {};
+  for (const o of brut.squareBrut || []) {
+    const j = (o.j || "").slice(0, 10);
+    if (!j || o.n === undefined || !limite || j > limite) continue;
     if (!o.n && !o.tm) continue;                      /* ticket sans article */
     const noms = String(o.n).split("|"), qs = String(o.q || "").split("|");
     const tms = String(o.tm || "").split("|"), txs = String(o.tx || "").split("|");
@@ -2440,18 +2468,19 @@ function adopterBrut(brut) {
     });
   }
   const ventesMois = {};
-  if (genereJour && premierJour) {
-    const courant = genereJour.slice(0, 7);
+  if (limite && premierJour) {
     for (const m of Object.keys(parMois)) {
       const jm = new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7), 0)).getUTCDate();
+      const dernierDuMois = m + "-" + String(jm).padStart(2, "0");
       const articles = {};
       for (const [k, e] of Object.entries(parMois[m])) articles[k] = [Math.round(e[0] * 1000) / 1000, Math.round(e[1] * 100) / 100];
-      if (m < courant) {
-        if (premierJour <= m + "-01") ventesMois[m] = { articles, complet: true, jours: jm, joursMois: jm };
-      } else if (m === courant) {
-        const jours = +genereJour.slice(8, 10) - 1;
-        if (jours > 0) ventesMois[m] = { articles, complet: false, jours, joursMois: jm, du: m + "-01",
-          au: m + "-" + String(jours).padStart(2, "0"), releve: brut.genere };
+      /* Complet = les tickets vont du 1er au dernier jour du mois. Sinon c'est
+         un mois en cours, et il ne porte que sur les jours réellement couverts. */
+      if (premierJour <= m + "-01" && limite >= dernierDuMois) {
+        ventesMois[m] = { articles, complet: true, jours: jm, joursMois: jm };
+      } else if (limite < dernierDuMois && limite >= m + "-01") {
+        ventesMois[m] = { articles, complet: false, jours: +limite.slice(8, 10), joursMois: jm,
+          du: m + "-01", au: limite, releve: brut.genere };
       }
     }
   }
@@ -2580,21 +2609,152 @@ demarrerEnClair();
     MOIS_CLOS = LISTE_MOIS.filter(function (m) { return !estPartiel(m); });
     EN_COURS = LISTE_MOIS.filter(estPartiel).pop() || null;
     batirReperesBase();
-    REPERES = REPERES_BASE.slice();
-    if (EN_COURS) REPERES.push({ nom: NOM_MOIS[+EN_COURS.slice(5, 7) - 1] + " projeté",
-      ca: projection(EN_COURS), projete: true });
+    recalculerPeriodes();
   }
   /* Le mois de référence par défaut est le mois en cours ; le dernier mois
      clos seulement s'il n'y a pas encore un jour complet dans le mois. */
   function moisDefaut() { return EN_COURS || MOIS_CLOS[MOIS_CLOS.length - 1]; }
   /* Le CA de départ : le réalisé d'un mois clos, la projection d'un mois en cours. */
   function caDepart(m) { return estPartiel(m) ? projection(m) : caDuMois(m); }
-  var MOIS_CHOISI = false;   /* vrai dès qu'on clique un mois : on ne le change plus d'office */
+  var MOIS_CHOISI = false;   /* vrai dès qu'on clique une période : on ne la change plus d'office */
   function joursDansMois(m) { return new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate(); }
   function moisCourt(m) {
     return NOM_MOIS[+m.slice(5, 7) - 1] + (estPartiel(m) ? " (" + PARTIEL[m].jours + " j)" : "");
   }
   function deMois(m) { var l = libelleMois(m); return (/^[aeiou]/i.test(l) ? "d'" : "de ") + l; }
+
+  /* ------------------------------------------------- période de référence
+     Le simulateur travaillait au mois ; il travaille à la période choisie dans
+     la barre du haut — mois, trimestre ou semestre. Le principe ne bouge pas :
+     on part de ce qui a été vendu, on en tire le mix donc le coût matière, et
+     on le compare à des charges fixes portées au même nombre de mois. Un
+     trimestre paie trois loyers et trois paies : c'est tout ce qui sépare le
+     point mort d'un mois de celui d'un trimestre.
+
+     Une période est réduite aux mois réellement relevés. Le 1er semestre 2026
+     n'a de ventes qu'à partir de mars : on compare quatre mois de charges à
+     quatre mois de recettes, et le libellé le dit. Rien n'est extrapolé en
+     arrière — seul le mois en cours, lui, est projeté, comme il l'a toujours
+     été. La granularité « semaine » de la barre ne vaut pas ici : les ventes
+     par article sont mensuelles, le simulateur reste alors sur le mois. */
+  var TAILLE = { M: 1, Q: 3, S: 6 };
+  var MOTPER = { M: "mois", Q: "trimestre", S: "semestre" };
+  var GRAN = "M", PERIODES = [], PER_EN_COURS = null;
+  function cleDe(m, g) {
+    var n = +m.slice(5, 7);
+    if (g === "Q") return "Q" + m.slice(0, 4) + "-" + Math.ceil(n / 3);
+    if (g === "S") return "S" + m.slice(0, 4) + "-" + (n <= 6 ? 1 : 2);
+    return "M" + m;
+  }
+  function moisDeCle(cle) {
+    var g = cle.charAt(0);
+    if (g === "M") return [cle.slice(1)];
+    var p = cle.slice(1).split("-"), premier = (+p[1] - 1) * TAILLE[g], out = [];
+    for (var i = 0; i < TAILLE[g]; i++) out.push(p[0] + "-" + String(premier + i + 1).padStart(2, "0"));
+    return out;
+  }
+  /* Ce qu'une période contient vraiment : les mois relevés, les jours couverts,
+     et le nombre de mois de charges fixes qu'elle porte. */
+  function per(cle) {
+    var g = cle.charAt(0);
+    var mois = moisDeCle(cle).filter(function (m) { return MOIS[m]; });
+    var jours = 0, joursMois = 0, partiel = null;
+    mois.forEach(function (m) {
+      var jm = joursDansMois(m);
+      joursMois += jm;
+      jours += PARTIEL[m] ? PARTIEL[m].jours : jm;
+      if (PARTIEL[m]) partiel = m;
+    });
+    return { cle: cle, gran: g, mot: MOTPER[g], mois: mois, nb: mois.length || 1,
+             jours: jours, jours_mois: joursMois, partiel: partiel,
+             entiere: mois.length === TAILLE[g], complet: mois.length === TAILLE[g] && !partiel };
+  }
+  function recalculerPeriodes() {
+    var vues = {}, out = [];
+    LISTE_MOIS.forEach(function (m) {
+      var k = cleDe(m, GRAN);
+      if (!vues[k]) { vues[k] = 1; out.push(k); }
+    });
+    PERIODES = out.sort();
+    PER_EN_COURS = PERIODES.filter(function (k) { return !!per(k).partiel; }).pop() || null;
+  }
+  function perDefaut() { return PERIODES[PERIODES.length - 1]; }
+  function caPer(cle) {
+    return per(cle).mois.reduce(function (s, m) { return s + caDuMois(m); }, 0);
+  }
+  /* Le réalisé des mois clos, plus la projection du mois en cours. */
+  function projPer(cle) {
+    return Math.round(per(cle).mois.reduce(function (s, m) { return s + projection(m); }, 0));
+  }
+  function estPartielPer(cle) { return !!per(cle).partiel; }
+  function caDepartPer(cle) { return estPartielPer(cle) ? projPer(cle) : caPer(cle); }
+  /* Les mois de charges fixes que porte la période de référence. */
+  function moisPortes() { return (E && E.per) ? per(E.per).nb : 1; }
+  function libellePer(cle) {
+    var g = cle.charAt(0), p = cle.slice(1).split("-");
+    if (g === "M") return libelleMois(cle.slice(1));
+    if (g === "Q") return "T" + p[1] + " " + p[0];
+    return (p[1] === "1" ? "1er" : "2e") + " semestre " + p[0];
+  }
+  function perCourt(cle) {
+    var x = per(cle);
+    return (x.gran === "M" ? NOM_MOIS[+cle.slice(6, 8) - 1] : libellePer(cle))
+      + (x.partiel || !x.entiere ? " (" + x.jours + " j)" : "");
+  }
+  function dePer(cle) {
+    return cle.charAt(0) === "M" ? deMois(cle.slice(1)) : "du " + libellePer(cle);
+  }
+  /* « septembre 2026 » au mois ; « T3 2026, juillet → septembre » dès qu'une
+     période ne couvre pas tous ses mois : le lecteur doit savoir sur quoi il lit. */
+  function longPer(cle) {
+    var x = per(cle);
+    if (x.gran === "M") return moisLong(cle.slice(1));
+    return libellePer(cle) + (x.entiere || !x.mois.length ? ""
+      : ", " + NOM_LONG[+x.mois[0].slice(5, 7) - 1] + " → " + NOM_LONG[+x.mois[x.nb - 1].slice(5, 7) - 1]);
+  }
+  function deLongPer(cle) { var l = longPer(cle); return (/^[aeiou]/i.test(l) ? "d'" : "de ") + l; }
+  function chargerPer(cle) {
+    var somme = {};
+    per(cle).mois.forEach(function (m) {
+      var v = MOIS[m];
+      for (var n in v) {
+        var e = somme[n] || (somme[n] = [0, 0]);
+        e[0] += v[n][0]; e[1] += v[n][1];
+      }
+    });
+    PRODUITS = [];
+    Object.keys(somme).forEach(function (n) {
+      var p = { n: n, q: somme[n][0], ca: somme[n][1] };
+      if (MAP[n]) p.v = MAP[n].map(function (o) { return [o[0], p.q * o[1]]; });
+      else p.ou = MOTIF[n] || "recette à créer";
+      PRODUITS.push(p);
+    });
+    PRODUITS.sort(function (a, b) { return b.ca - a.ca; });
+  }
+  /* Calcule f() comme si `cle` était la période de référence. */
+  function auMixPer(cle, f) {
+    var garde = PRODUITS;
+    chargerPer(cle);
+    try { return f(); } finally { PRODUITS = garde; }
+  }
+  /* Les repères de la jauge, portés à la durée de la période : les moyennes et
+     l'hypothèse du BP sont mensuelles, on les multiplie ; le repère du passé,
+     lui, devient la dernière période close de même durée, réellement relevée. */
+  function batirReperes() {
+    var n = moisPortes();
+    REPERES = REPERES_BASE.map(function (r) { return { nom: r.nom, ca: Math.round(r.ca * n) }; });
+    if (n > 1) {
+      var i = PERIODES.indexOf(E.per), prec = null;
+      for (var k = i - 1; k >= 0 && !prec; k--) if (per(PERIODES[k]).complet) prec = PERIODES[k];
+      REPERES[0] = prec ? { nom: libellePer(prec), ca: Math.round(caPer(prec)) }
+        : { nom: REPERES_BASE[0].nom + " ×" + n, ca: Math.round(REPERES_BASE[0].ca * n) };
+      for (var j = 1; j < REPERES.length; j++) REPERES[j].nom = REPERES_BASE[j].nom + " ×" + n;
+    }
+    if (PER_EN_COURS) REPERES.push({ nom: perProj(PER_EN_COURS), ca: projPer(PER_EN_COURS), projete: true });
+  }
+  function perProj(cle) {
+    return (cle.charAt(0) === "M" ? NOM_MOIS[+cle.slice(6, 8) - 1] : libellePer(cle)) + " projeté";
+  }
   var NOM_LONG = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
   function moisLong(m) { return NOM_LONG[+m.slice(5, 7) - 1] + " " + m.slice(0, 4); }
   function majuscule(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
@@ -2608,7 +2768,7 @@ demarrerEnClair();
 
 
   var DEFAUT = {
-    mois: null, ca: null, provision: 10, commission: 0.28, suppose: 30,   /* mois null = moisDefaut() */
+    per: null, ca: null, provision: 10, commission: 0.28, suppose: 30,   /* per null = perDefaut() */
     equipe: [{ nom:"Boulaye", v:1508.16 }, { nom:"Orianna", v:2437.86 },
              { nom:"Magda", v:2388.09 }, { nom:"Mathis", v:2025.93 }],
     fixes: [{ nom:"Loyer HT", v:5150 }, { nom:"Énergie (EDF)", v:216 },
@@ -2622,8 +2782,8 @@ demarrerEnClair();
   function copier(p) {
     var prix = {};
     for (var c in ING) prix[c] = ING[c].p;
-    var m = p.mois && MOIS[p.mois] ? p.mois : moisDefaut();
-    return { mois:m, ca:(p.ca === null ? caDepart(m) : p.ca),
+    var k = (p.per && PERIODES.indexOf(p.per) >= 0) ? p.per : perDefaut();
+    return { per:k, ca:(p.ca === null ? caDepartPer(k) : p.ca),
       provision:p.provision, commission:p.commission, suppose:p.suppose,
       prix: prix,
       equipe:p.equipe.map(function (o) { return { nom:o.nom, v:o.v }; }),
@@ -2676,22 +2836,27 @@ demarrerEnClair();
     return s;
   }
   function chargesFixes(e) { return masseSalariale(e) + autresFixes(e); }
+  /* Loyer, salaires et abonnements sont saisis au mois : un trimestre en porte
+     trois. C'est la seule chose qui change entre le point mort d'un mois et
+     celui d'une période plus longue — le coût matière, lui, est un taux. */
+  function chargesPeriode(e) { return chargesFixes(e) * moisPortes(); }
   function compte(e, ca) {
     var fc = coutMatiere(e.suppose).taux;
+    var n = moisPortes();
     var matieres = ca * fc;
     var commission = ca * e.commission / 100;
     var cogs = matieres + commission;
-    var cf = chargesFixes(e);
+    var cf = chargesFixes(e) * n;
     var mb = ca - cogs;
     return { ca:ca, fc:fc, matieres:matieres, commission:commission, cogs:cogs,
-             mb:mb, mbPct: ca ? mb / ca : 0, ms:masseSalariale(e),
-             autres:autresFixes(e), cf:cf, ebitda: mb - cf };
+             mb:mb, mbPct: ca ? mb / ca : 0, ms:masseSalariale(e) * n,
+             autres:autresFixes(e) * n, cf:cf, mois:n, ebitda: mb - cf };
   }
   // Sans palier d'embauche, le point mort est une simple division.
   function pointMort(e) {
     var v = coutMatiere(e.suppose).taux + e.commission / 100;
     if (v >= 1) return { ca:null, note:"les matières absorbent tout le chiffre d'affaires" };
-    return { ca: chargesFixes(e) / (1 - v), note:null };
+    return { ca: chargesPeriode(e) / (1 - v), note:null };
   }
 
   /* ------------------------------------------------------------- affichage */
@@ -2818,19 +2983,22 @@ demarrerEnClair();
 
   function batirMois() {
     var h = $("mois"); h.textContent = "";
-    LISTE_MOIS.forEach(function (m) {
+    h.setAttribute("aria-label", majuscule(MOTPER[GRAN]) + " de référence");
+    PERIODES.forEach(function (k) {
+      var x = per(k);
       var b = document.createElement("button");
-      b.type = "button"; b.textContent = libelleMois(m) + (estPartiel(m) ? " · en cours" : "");
-      if (estPartiel(m)) {
+      b.type = "button"; b.textContent = libellePer(k) + (x.partiel ? " · en cours" : "");
+      if (x.partiel || !x.entiere) {
         b.className = "partiel";
-        b.title = "Mois incomplet : " + PARTIEL[m].jours + " jours sur " + PARTIEL[m].jours_mois
-          + ". Le CA de départ est une projection.";
+        b.title = majuscule(x.mot) + " incomplet : " + x.jours + " jours sur " + x.jours_mois
+          + (x.entiere ? "" : ", " + x.nb + " mois relevés sur " + TAILLE[x.gran])
+          + (x.partiel ? ". Le CA de départ est une projection." : ".");
       }
-      b.setAttribute("aria-pressed", m === E.mois ? "true" : "false");
+      b.setAttribute("aria-pressed", k === E.per ? "true" : "false");
       b.addEventListener("click", function () {
         MOIS_CHOISI = true;
-        E.mois = m; E.ca = caDepart(m);
-        chargerMois(m);
+        E.per = k; E.ca = caDepartPer(k);
+        chargerPer(k);
         $("ca").value = E.ca.toFixed(0); $("ca-r").value = E.ca;
         batirMois(); rendre();
       });
@@ -3067,7 +3235,7 @@ demarrerEnClair();
   function pc(x) { return (x === null || !isFinite(x)) ? "—" : pct(x); }
 
   function dessinerTables(cm) {
-    var caMois = "CA " + moisCourt(E.mois);
+    var caMois = "CA " + perCourt(E.per);
     var manquants = PRODUITS.filter(function (p) { return !p.v; });
     tableTriable("a-chiffrer", [
       { t: "Produit", tri: function (d) { return d.n; } },
@@ -3081,7 +3249,7 @@ demarrerEnClair();
     }), { col: 2, sens: -1 });
     $("atc-intro").textContent = manquants.length + " articles sur " + PRODUITS.length
       + " n'ont pas de recette, soit " + eur(cm.caInconnu) + " — " + pct(cm.caInconnu / cm.caTotal)
-      + " du chiffre d'affaires " + deMois(E.mois) + (estPartiel(E.mois) ? " (" + PARTIEL[E.mois].jours + " premiers jours)" : "")
+      + " du chiffre d'affaires " + dePer(E.per) + (estPartielPer(E.per) ? " (" + per(E.per).jours + " premiers jours)" : "")
       + ". Ils prennent le taux supposé réglé à gauche. Pas de recette, donc pas de coût unitaire ni de marge à trier ici.";
 
     var connus = PRODUITS.filter(function (p) { return p.v; });
@@ -3179,7 +3347,7 @@ demarrerEnClair();
       + " encaissés, soit " + pct(moyen / prixU) + " de coût matière et " + eur(prixU - moyen, 2)
       + " de marge brute.</b> Le salé seul en représente " + pct(saleMoyen / prixU)
       + " : la boisson et le dessert offerts ajoutent " + eur(mB + mD, 2) + ". Sur les " + f.q
-      + " formules " + deMois(E.mois) + (estPartiel(E.mois) ? " (" + PARTIEL[E.mois].jours + " premiers jours)" : "")
+      + " formules " + dePer(E.per) + (estPartielPer(E.per) ? " (" + per(E.per).jours + " premiers jours)" : "")
       + ", cela fait " + eur(total) + " de matière et " + eur(f.ca - total) + " de marge.</p>"
       + "<p>Ce n'est pas la boisson qui coûte, c'est le dessert : " + eur(mB, 2) + " contre "
       + eur(mD, 2) + ". Offrir un café ne vous coûte presque rien ; offrir une part de cake, "
@@ -3214,37 +3382,56 @@ demarrerEnClair();
      honnête, le coût matière dépendant de ce qui a été vendu. */
   function dessinerEnCours() {
     var n = $("p-encours");
-    if (!EN_COURS) { n.hidden = true; $("p-pied-encours").textContent = ""; return; }
-    var P = PARTIEL[EN_COURS], ca = caDuMois(EN_COURS), proj = projection(EN_COURS);
-    /* Même point mort que le reste de la page (mix du mois de référence), et,
-       pour mémoire, celui qu'on obtient au mix du mois en cours. */
-    var pm = pointMort(E);
-    var pmM = auMix(EN_COURS, function () { return pointMort(E); });
+    if (!PER_EN_COURS) { n.hidden = true; $("p-pied-encours").textContent = ""; return; }
+    var C = PER_EN_COURS, X = per(C), P = PARTIEL[X.partiel];
+    var ca = caPer(C), proj = projPer(C);
+    /* Le point mort comparé ici est celui du même nombre de mois que la période
+       en cours : on ne met pas un trimestre de recettes en face d'un mois de
+       charges. Même mix que le reste de la page, et, pour mémoire, celui qu'on
+       obtient au mix de la période en cours. */
+    var garde = E.per, pm, pmM;
+    try {
+      E.per = C;                    /* les charges portent la durée de la période en cours */
+      pm = pointMort(E);            /* au mix de la période de référence, déjà chargé */
+      pmM = auMixPer(C, function () { return pointMort(E); });
+    } finally { E.per = garde; }
     n.hidden = false;
-    if (pm.ca === null) { n.textContent = "Mois en cours : pas de point mort atteignable avec ces hypothèses."; return; }
+    if (pm.ca === null) { n.textContent = majuscule(X.mot) + " en cours : pas de point mort atteignable avec ces hypothèses."; return; }
     var ecart = proj - pm.ca;
-    n.innerHTML = "<p><b>" + majuscule(moisLong(EN_COURS)) + ", mois en cours : " + P.jours + " jours sur "
-      + P.jours_mois + ".</b> " + eur(ca) + " encaissés, soit " + eur(ca / P.jours) + " par jour, contre "
-      + eur(pm.ca / P.jours_mois) + " par jour pour atteindre le point mort sur un mois de " + P.jours_mois + " jours.</p>"
-      + "<p>Projeté sur le mois entier : <b>" + eur(proj) + ", " + (ecart >= 0 ? "au-dessus" : "en dessous")
-      + " du point mort de " + eur(Math.abs(ecart)) + "</b>. C'est une projection faite sur " + P.jours
-      + " jours, pas un réalisé : elle suppose que la fin du mois ressemble à son début."
-      + (pmM.ca !== null && E.mois !== EN_COURS ? " Au mix de vente " + deMoisLong(EN_COURS) + ", le point mort serait de "
+    n.innerHTML = "<p><b>" + majuscule(longPer(C)) + ", " + X.mot + " en cours : " + X.jours + " jours sur "
+      + X.jours_mois + ".</b> " + eur(ca) + " encaissés, soit " + eur(ca / X.jours) + " par jour, contre "
+      + eur(pm.ca / X.jours_mois) + " par jour pour atteindre le point mort sur un " + X.mot + " de " + X.jours_mois + " jours.</p>"
+      + "<p>Projeté sur le " + X.mot + " entier : <b>" + eur(proj) + ", " + (ecart >= 0 ? "au-dessus" : "en dessous")
+      + " du point mort de " + eur(Math.abs(ecart)) + "</b>. C'est une projection faite sur " + X.jours
+      + " jours, pas un réalisé : elle suppose que la fin du " + X.mot + " ressemble à son début."
+      + (pmM.ca !== null && garde !== C ? " Au mix de vente " + deLongPer(C) + ", le point mort serait de "
         + eur(pmM.ca) + " au lieu de " + eur(pm.ca) + "." : "") + "</p>";
-    var rel = new Date(P.releve), j1 = +P.du.slice(8);
-    $("p-pied-encours").textContent = majuscule(moisLong(EN_COURS)) + " : ventes par article du "
-      + (j1 === 1 ? "1er" : j1) + " au " + (+P.au.slice(8)) + (P.source === "tickets"
+    var rel = new Date(P.releve), du = X.mois[0] + "-01", j1 = +du.slice(8);
+    var etendue = X.gran === "M"
+      ? "du " + (j1 === 1 ? "1er" : j1) + " au " + (+P.au.slice(8))
+      : "du " + (j1 === 1 ? "1er" : j1) + " " + NOM_LONG[+du.slice(5, 7) - 1]
+        + " au " + (+P.au.slice(8)) + " " + NOM_LONG[+P.au.slice(5, 7) - 1];
+    $("p-pied-encours").textContent = majuscule(longPer(C)) + " : ventes par article " + etendue
+      + (P.source === "tickets"
         ? ", recalculées depuis les tickets Square publiés par Make " + publieLe(P.releve)
           + " (mise à jour à chaque rafraîchissement)"
         : ", relevées dans Square" + (isNaN(rel) ? "" : " le " + rel.toLocaleDateString("fr-FR")))
-      + ", avec les mêmes mesures que les mois clos ; mois incomplet, projeté au prorata des jours.";
+      + ", avec les mêmes mesures que les mois clos ; " + X.mot + " incomplet, projeté au prorata des jours.";
   }
-  function deMoisLong(m) { var l = moisLong(m); return (/^[aeiou]/i.test(l) ? "d'" : "de ") + l; }
 
   function rendre() {
+    var X = per(E.per), n = X.nb, mot = X.mot;
+    batirReperes();
     var cm = coutMatiere(E.suppose);
     var r = compte(E, E.ca);
     var pm = pointMort(E);
+    /* Le curseur de CA parle de la période : son libellé, sa course et son
+       plafond suivent la durée, sinon un trimestre butte contre le plafond
+       d'un mois. */
+    var lab = $("ca-lab"); if (lab) lab.textContent = "CA " + (n === 1 ? "mensuel" : "du " + mot) + " HT";
+    $("ca").max = 60000 * n;
+    $("ca-r").min = 8000 * n; $("ca-r").max = 45000 * n; $("ca-r").step = 100 * n;
+    $("ca-r").value = E.ca;
 
     $("ms-total").textContent = eur(masseSalariale(E));
     $("cf-total").textContent = eur(chargesFixes(E));
@@ -3259,12 +3446,15 @@ demarrerEnClair();
     if (pm.ca === null) { v.textContent = "Pas de point mort atteignable"; vn.textContent = pm.note; }
     else {
       v.textContent = (ecart >= 0 ? "Au-dessus du point mort de " : "Sous le point mort de ")
-        + eur(Math.abs(ecart)) + " par mois";
+        + eur(Math.abs(ecart)) + (n === 1 ? " par mois" : " sur le " + mot);
       /* Sur douze mois, c'est l'EBITDA qui s'accumule, pas l'écart de CA : chaque
-         euro manquant ne coûte que sa marge sur coûts variables. */
-      vn.textContent = "Il faut " + eur(pm.ca) + " de CA mensuel pour couvrir matières, équipe et charges fixes. "
-        + "Vous en êtes à " + eur(E.ca) + (estPartiel(E.mois) ? " (projection " + deMois(E.mois) + ")" : "")
-        + ", soit " + eur(Math.abs(r.ebitda) * 12)
+         euro manquant ne coûte que sa marge sur coûts variables. Une période de
+         trois mois en contient quatre par an, pas douze. */
+      vn.textContent = "Il faut " + eur(pm.ca) + " de CA "
+        + (n === 1 ? "mensuel" : X.entiere ? "sur le " + mot : "sur les " + n + " mois relevés")
+        + " pour couvrir matières, équipe et charges fixes. "
+        + "Vous en êtes à " + eur(E.ca) + (X.partiel ? " (projection " + dePer(E.per) + ")" : "")
+        + ", soit " + eur(Math.abs(r.ebitda) * 12 / n)
         + (r.ebitda >= 0 ? " d'EBITDA sur douze mois." : " de perte d'exploitation sur douze mois à ce rythme.");
     }
 
@@ -3272,27 +3462,31 @@ demarrerEnClair();
     $("m-mb-det").textContent = eur(r.mb) + " après " + eur(r.cogs) + " de matières et commissions.";
     $("m-ebitda").textContent = eur(r.ebitda);
     $("m-ebitda").style.color = r.ebitda >= 0 ? "var(--vert)" : "var(--rouge)";
-    $("m-ebitda-det").textContent = pct(r.ca ? r.ebitda / r.ca : 0) + " du CA, soit " + eur(r.ebitda * 12) + " par an.";
+    $("m-ebitda-det").textContent = pct(r.ca ? r.ebitda / r.ca : 0) + " du CA, soit " + eur(r.ebitda * 12 / n) + " par an.";
     $("m-pm").textContent = pm.ca === null ? "—" : eur(pm.ca);
     /* Le shop ouvre tous les jours : 30,44 jours par mois en moyenne. Les CA
        par jour viennent tous deux des ventes par article, même source. */
     var clos = MOIS_CLOS[MOIS_CLOS.length - 1];
     $("m-pm-det").textContent = pm.ca === null ? "hors d'atteinte"
-      : eur(pm.ca / 30.44) + " par jour, ouvert tous les jours. " + majuscule(NOM_MOIS[+clos.slice(5, 7) - 1]) + " a fait "
+      : eur(pm.ca / (30.44 * n)) + " par jour, ouvert tous les jours. " + majuscule(NOM_MOIS[+clos.slice(5, 7) - 1]) + " a fait "
         + eur(caDuMois(clos) / joursDansMois(clos)) + " par jour"
         + (EN_COURS ? ", " + NOM_MOIS[+EN_COURS.slice(5, 7) - 1] + " en cours " + eur(caDuMois(EN_COURS) / PARTIEL[EN_COURS].jours) : "") + ".";
-    var PM = PARTIEL[E.mois];
-    $("ca-aide").textContent = PM
-      ? "Mois de référence : " + libelleMois(E.mois) + ", en cours — " + eur(caDuMois(E.mois)) + " encaissés en "
-        + PM.jours + " jours sur " + PM.jours_mois + " (" + eur(caDuMois(E.mois) / PM.jours) + " par jour). "
-        + "Le CA de départ est la projection sur le mois entier, " + eur(projection(E.mois)) + " : une projection, pas un réalisé."
-      : "Mois de référence : " + libelleMois(E.mois) + ", " + eur(caDuMois(E.mois)) + " encaissés.";
+    /* Combien de mois la période porte vraiment : un semestre relevé sur quatre
+       mois compare quatre mois de charges à quatre mois de recettes. */
+    var reduite = X.entiere ? "" : " Relevé sur " + n + " des " + TAILLE[X.gran] + " mois, "
+      + NOM_LONG[+X.mois[0].slice(5, 7) - 1] + " → " + NOM_LONG[+X.mois[n - 1].slice(5, 7) - 1]
+      + " : les charges fixes sont portées à " + n + " mois, pas à " + TAILLE[X.gran] + ".";
+    $("ca-aide").textContent = (X.partiel
+      ? majuscule(mot) + " de référence : " + libellePer(E.per) + ", en cours — " + eur(caPer(E.per)) + " encaissés en "
+        + X.jours + " jours sur " + X.jours_mois + " (" + eur(caPer(E.per) / X.jours) + " par jour). "
+        + "Le CA de départ est la projection sur le " + mot + " entier, " + eur(projPer(E.per)) + " : une projection, pas un réalisé."
+      : majuscule(mot) + " de référence : " + libellePer(E.per) + ", " + eur(caPer(E.per)) + " encaissés.") + reduite;
     /* L'en-tête replié porte le chiffre de la section, comme les huit autres. */
     var sv = $("sv-pointmort");
     if (sv) sv.innerHTML = "point mort <b>" + eur(pm.ca === null ? 0 : pm.ca) + "</b> · marge "
       + pct(r.mbPct) + " · <span class='" + (r.ebitda >= 0 ? "" : "crit") + "'>EBITDA "
       + eur(r.ebitda) + "</span>"
-      + (EN_COURS ? " · " + NOM_MOIS[+EN_COURS.slice(5, 7) - 1] + " projeté " + eur(projection(EN_COURS)) : "");
+      + (PER_EN_COURS ? " · " + perProj(PER_EN_COURS) + " " + eur(projPer(PER_EN_COURS)) : "");
 
     dessinerCouverture(cm);
     dessinerEnCours();
@@ -3427,7 +3621,7 @@ demarrerEnClair();
   }
   function demarrer(etat) {
     E = etat;
-    chargerMois(E.mois);
+    chargerPer(E.per);
     batirMois(); batirEquipe(); batirFixes(); batirAchats();
     $("ca").value = E.ca.toFixed(0); $("ca-r").value = E.ca;
     $("provision").value = E.provision;
@@ -3451,7 +3645,7 @@ demarrerEnClair();
   $("p-reset").addEventListener("click", function () { demarrer(copier(DEFAUT)); });
   /* Revenir à ce que dit le fichier, sans toucher au mois ni au CA explorés. */
   $("p-annuler").addEventListener("click", function () {
-    var e = etatDepuis(PARTAGE.doc); e.mois = E.mois; e.ca = E.ca;
+    var e = etatDepuis(PARTAGE.doc); e.per = E.per; e.ca = E.ca;
     $("p-hyp-msg").textContent = ""; $("p-hyp-msg").className = "hypmsg";
     demarrer(e);
   });
@@ -3486,6 +3680,25 @@ demarrerEnClair();
   PARTAGE.articlesMensuels = function () { return { mois: MOIS, partiel: PARTIEL }; };
   if (PARTAGE.majProduits) PARTAGE.majProduits();
 
+  /* La barre de période du haut commande le simulateur : changer de
+     granularité ou de période y change la période de référence, donc le mix,
+     donc le nombre de mois de charges fixes. La granularité « semaine » n'a
+     pas de sens ici — les ventes par article sont mensuelles — le simulateur
+     reste alors sur ce qu'il affichait. */
+  PARTAGE.simPeriode = function (p) {
+    if (!E || !p || !TAILLE[p.gran]) return;
+    var avant = E.per;
+    if (p.gran !== GRAN) { GRAN = p.gran; MOIS_CHOISI = false; recalculerPeriodes(); }
+    var voulu = p.cle && PERIODES.indexOf(p.cle) >= 0 ? p.cle : null;
+    E.per = voulu || (PERIODES.indexOf(E.per) >= 0 ? E.per : perDefaut());
+    if (voulu) MOIS_CHOISI = false;
+    if (E.per === avant) { batirMois(); return; }
+    E.ca = caDepartPer(E.per);
+    chargerPer(E.per);
+    $("ca").value = Math.round(E.ca); $("ca-r").value = E.ca;
+    batirMois(); rendre();
+  };
+
   PARTAGE.simDonnees = function (d) {
     var v = (d && d.ventes) || {}, enCours = null, change = false;
     Object.keys(v).sort().forEach(function (m) {
@@ -3507,9 +3720,9 @@ demarrerEnClair();
     if (d && Array.isArray(d.histo) && d.histo.length >= 3) { HISTO = d.histo.slice(-12); change = true; }
     if (!change) return;
     recalculerMois();
-    if (!MOIS_CHOISI || !MOIS[E.mois]) { E.mois = moisDefaut(); E.ca = caDepart(E.mois); }
-    else if (estPartiel(E.mois)) E.ca = caDepart(E.mois);
-    chargerMois(E.mois);
+    if (!MOIS_CHOISI || PERIODES.indexOf(E.per) < 0) { E.per = perDefaut(); E.ca = caDepartPer(E.per); }
+    else if (estPartielPer(E.per)) E.ca = caDepartPer(E.per);
+    chargerPer(E.per);
     $("ca").value = Math.round(E.ca); $("ca-r").value = E.ca;
     batirMois(); dessinerSpark(); rendre();
     if (PARTAGE.majProduits) PARTAGE.majProduits();
@@ -3525,7 +3738,7 @@ demarrerEnClair();
   PARTAGE.pret.then(function (doc) {
     var intact = JSON.stringify(aEnregistrer(E)) === JSON.stringify(aEnregistrer(SAUVE));
     SAUVE = etatDepuis(doc); LU = true;
-    if (intact) { var e = etatDepuis(doc); e.mois = E.mois; e.ca = E.ca; demarrer(e); }
+    if (intact) { var e = etatDepuis(doc); e.per = E.per; e.ca = E.ca; demarrer(e); }
     else barre();
   });
 })();
